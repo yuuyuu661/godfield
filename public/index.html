@@ -3,29 +3,56 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>トーナメント表</title>
+  <title>ドラフト登録（閲覧公開）</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <h1>🏆 トーナメント表</h1>
-  <section>
-    <form id="team-form">
-      <input name="name" placeholder="チーム名" required>
-      <input name="member1" placeholder="メンバー1">
-      <input name="member2" placeholder="メンバー2">
-      <input name="member3" placeholder="メンバー3">
-      <input name="password" type="password" placeholder="管理パスワード" required>
-      <button type="submit">登録</button>
-    </form>
-    <button id="start">大会開始</button>
-  </section>
+  <header>
+    <h1>ドラフト登録</h1>
+    <p class="sub">登録にはパスワードが必要／一覧は誰でも閲覧OK</p>
+  </header>
 
-  <section id="teams"></section>
-  <section id="bracket"></section>
+  <main class="grid">
+    <section class="card">
+      <h2>登録（管理用）</h2>
+      <form id="form">
+        <label>チーム名 <input name="team_name" required></label>
+        <div class="row">
+          <label>メンバー1 <input name="member1"></label>
+          <label>メンバー2 <input name="member2"></label>
+          <label>メンバー3 <input name="member3"></label>
+        </div>
+        <label>登録パスワード <input name="password" type="password" required></label>
+        <button type="submit">追加</button>
+      </form>
+
+      <details class="mt8">
+        <summary>誤登録の削除</summary>
+        <div class="row mt8">
+          <input id="delete-id" type="number" placeholder="ID">
+          <input id="delete-pass" type="password" placeholder="登録パスワード">
+          <button id="delete-btn">削除</button>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>登録一覧（公開）</h2>
+      <div id="list"></div>
+    </section>
+  </main>
+
+  <template id="row-tpl">
+    <div class="row-item">
+      <div class="id"></div>
+      <div class="team"></div>
+      <div class="members"></div>
+      <div class="time"></div>
+    </div>
+  </template>
 
   <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="/api.js"></script>
-  <script type="module" src="/bracket.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
