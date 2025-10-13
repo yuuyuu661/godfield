@@ -1,7 +1,8 @@
-// PostgreSQL接続（Railway想定）
+// PostgreSQL接続（Railway/ローカル両対応）
 const { Pool } = require('pg');
 
-const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/postgres';
+const connectionString =
+  process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/postgres';
 
 const pool = new Pool({
   connectionString,
@@ -9,11 +10,9 @@ const pool = new Pool({
 });
 
 async function query(text, params) {
-  const res = await pool.query(text, params);
-  return res;
+  return pool.query(text, params);
 }
 
-// トランザクション実行ヘルパ
 async function tx(fn) {
   const client = await pool.connect();
   try {
