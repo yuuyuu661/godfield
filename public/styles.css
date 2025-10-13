@@ -1,42 +1,93 @@
 :root { color-scheme: light dark; }
+
 * { box-sizing: border-box; }
-body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Yu Gothic", sans-serif; margin: 16px; }
-header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-h1 { margin: 0 0 8px; font-size: 1.4rem; }
-h2 { margin: 0 0 8px; font-size: 1.1rem; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
+  background: #f7f7f9;
+  color: #111;
+}
 
-.grid { display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start; }
-.card { border: 1px solid #ccc; border-radius: 12px; padding: 12px; background: rgba(255,255,255,0.04); }
-.card.wide { grid-column: 1 / span 2; }
+header { padding: 16px 20px; }
+h1 { margin: 0 0 6px; font-size: 1.5rem; }
+h2 { margin: 0 0 12px; font-size: 1.2rem; }
 
-.row { display: flex; gap: 8px; flex-wrap: wrap; }
-label { display: block; font-size: 0.9rem; }
-input, button { padding: 8px 10px; border-radius: 8px; border: 1px solid #bbb; background: transparent; }
-button { cursor: pointer; }
-button:hover { filter: brightness(1.1); }
+.status { color: #333; }
 
-#teams { display: grid; gap: 8px; margin-top: 8px; max-height: 260px; overflow: auto; }
-.team { border: 1px dashed #aaa; border-radius: 8px; padding: 8px; }
+.grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) minmax(320px, 420px) 1fr;
+  gap: 16px;
+  padding: 0 16px 24px 16px;
+}
+@media (max-width: 1024px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+.card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #ddd;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+.card.wide { grid-column: 1 / -1; }
+
+.row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: center; margin-bottom: 10px; }
+.row > label { grid-column: 1 / -1; font-weight: 600; }
+.row > input { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; background: #fff; color: #111; }
+.buttons { display: flex; gap: 10px; }
+
+button {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #bbb;
+  background: #f2f2f2;
+  cursor: pointer;
+}
+button:hover { filter: brightness(.98); }
+button.danger { background: #ffeaea; border-color: #ffbdbd; color: #a40000; }
+button.small { padding: 6px 10px; }
+
+#teams { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.team {
+  border: 1px solid #e5e5e5; border-radius: 10px; padding: 8px 10px;
+  display: grid; grid-template-columns: 1fr auto; gap: 4px;
+}
 .team-name { font-weight: 700; }
-.team-members { font-size: 0.9rem; opacity: 0.85; }
+.team-mems { color: #555; font-size: 0.9rem; }
+.team .danger { align-self: center; }
 
-#bracket { overflow: auto; padding: 8px; border: 1px solid #ccc; border-radius: 12px; min-height: 320px; background:
-  linear-gradient(180deg, rgba(0,0,0,0.03), transparent 60%); }
+#bracket {
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  min-height: 360px;
+  background: #fff; /* ← スマホで黒くならないよう白地固定 */
+}
 
-.match { cursor: pointer; transition: transform .1s ease; }
-.match:hover { transform: scale(1.01); filter: brightness(1.05); }
+/* SVG styles */
+#bracket svg { display: block; }
+.box { fill: #ffffff; stroke: #333; }
+.team-text { font-size: 12px; fill: #111; }
+.winmark { font-size: 11px; fill: #007b00; font-weight: 700; }
+.slot { stroke: #aaa; stroke-width: 1.2; }
 
-.slot { fill: none; stroke: #999; stroke-width: 2; }
-.slot.a { stroke: #6aa9ff; }
-.slot.b { stroke: #ff9090; }
-.slot.win { stroke: #67ff67; stroke-width: 3; }
+.empty { color: #666; }
 
-.box { fill: rgba(255,255,255,0.05); stroke: #888; rx: 8; }
-.team-text { font-size: 12px; }
+@media (prefers-color-scheme: dark) {
+  body { background: #0f1012; color: #eee; }
+  .status { color: #bbb; }
+  .card { background: rgba(255,255,255,0.06); border-color: #2a2a2a; }
+  .row > input { background: #1b1b1b; color: #eee; border-color: #333; }
+  button { background: #222; border-color: #444; color: #eee; }
+  button.danger { background: #3a1919; border-color: #592525; color: #ffd2d2; }
 
-#legend { margin-top: 8px; display: flex; gap: 12px; align-items: center; font-size: 0.9rem; }
-.leg { display: inline-flex; gap: 6px; align-items: center; }
-.leg::before { content: ""; display:inline-block; width: 18px; height: 3px; background: #999; border-radius: 2px; }
-.leg-a::before { background: #6aa9ff; }
-.leg-b::before { background: #ff9090; }
-.leg-win::before { background: #67ff67; height: 4px; }
+  #bracket { background: #131313; border-color: #2a2a2a; }
+  .box { fill: #1a1a1a; stroke: #777; }
+  .team-text { fill: #eee; }
+  .slot { stroke: #666; }
+  .winmark { fill: #6bff6b; }
+}
