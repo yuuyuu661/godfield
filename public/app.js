@@ -10,11 +10,15 @@ async function refresh() {
   renderTeams(state.teams);
 
   renderBracket('#bracket', state, async (m) => {
-    const pw = $('#admin-pass').value;
+    // live中のみ操作
     if ((state.tournament?.status || '') !== 'live') return;
     if (!m.team_a && !m.team_b) return;
     const choice = await pickWinnerDialog(m, state.teams);
     if (!choice) return;
+
+    const pw = $('#admin-pass').value;
+    if (!pw) return alert('管理パスワードを入力してください');
+
     try {
       await API.decideWinner(pw, m.id, choice);
       await refresh();
@@ -67,7 +71,7 @@ async function pickWinnerDialog(m, teams) {
   return null;
 }
 
-// ボタン
+// -------------- Buttons --------------
 $('#add-team').addEventListener('click', async () => {
   const pw = $('#admin-pass').value;
   if (!pw) return alert('管理パスワードを入力してください');
