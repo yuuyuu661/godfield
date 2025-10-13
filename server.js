@@ -17,129 +17,59 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-function requireAdmin(req, res, next) {
-  const pass = req.body?.password || req.query?.password;
+async function initDb() {
+  const sql = fs.readFileSync('./schema.sql', 'utf8');
+  await query(sql);
+  console.log('DB ready');
+}
+
+function ok(res, data) { res.json(data); }
+function requirePass(req, res, next) {
+  const pass = req.body?.password || req.query?.password || req.headers['x-admin-pass'];
   if (pass !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   next();
 }
 
-async function initDb() {
-  const sql = fs.readFileSync('./schema.sql', 'utf8');
-  await query(sql);
-  const t = await query('SELECT * FROM tournament ORDER BY id LIMIT 1');
-  if (t.rowCount === 0) {
-    await query("INSERT INTO tournament (title, status) VALUES ($1, 'registering')", ['Tournament']);
-  }
-  console.log('DB initialized');
-}
+/* ========== API ========== */
 
-function ceilPow2(n) { let p = 1; while (p < n) p <<= 1; return p; }
-function seedOrder(n) {
-  let arr = [1, 2];
-  while (arr.length < n) {
-    const m = arr.length * 2;
-    const next = [];
-    for (let i = 0; i < arr.length; i++) next.push(arr[i]);
-    for (let i = arr.length - 1; i >= 0; i--) next.push(m + 1 - arr[i]);
-    arr = next;
-  }
-  return arr.slice(0, n);
-}
-
-async function getState() {
-  const t = await query('SELECT * FROM tournament ORDER BY id LIMIT 1');
-  const teams = await query('SELECT * FROM teams ORDER BY id');
-  const matches = await query('SELECT * FROM matches ORDER BY round, position');
-  return { tournament: t.rows[0], teams: teams.rows, matches: matches.rows };
-}
-
-io.on('connection', async (socket) => {
-  socket.emit('state', await getState());
+// 全件（公開）
+app.get('/api/entries', async (_req, res) => {
+  const r = await query('SELECT * FROM entries ORDER BY id ASC');
+  ok(res, r.rows);
 });
 
-function broadcast() {
-  getState().then((state) => io.emit('state', state));
-}
-
-// ========== API ==========
-
-// 登録一覧
-app.get('/api/state', async (_req, res) => res.json(await getState()));
-
-// チーム登録
-app.post('/api/teams', requireAdmin, async (req, res) => {
-  const { name, member1, member2, member3 } = req.body;
-  if (!name) return res.status(400).json({ error: 'name required' });
+// 追加（登録パス必要）
+app.post('/api/entries', requirePass, async (req, res) => {
+  const { team_name, member1='', member2='', member3='' } = req.body || {};
+  if (!team_name) return res.status(400).json({ error: 'team_name is required' });
   const r = await query(
-    'INSERT INTO teams (name, member1, member2, member3) VALUES ($1,$2,$3,$4) RETURNING *',
-    [name, member1 || '', member2 || '', member3 || '']
+    'INSERT INTO entries (team_name, member1, member2, member3) VALUES ($1,$2,$3,$4) RETURNING *',
+    [team_name, member1, member2, member3]
   );
-  broadcast();
-  res.json(r.rows[0]);
+  io.emit('entries:update'); // リアルタイム更新
+  ok(res, r.rows[0]);
 });
 
-// 大会開始
-app.post('/api/start', requireAdmin, async (_req, res) => {
-  const teams = await query('SELECT * FROM teams ORDER BY id');
-  const N = teams.rowCount;
-  if (N < 2) return res.status(400).json({ error: 'Need 2+ teams' });
-
-  await query('DELETE FROM matches');
-  const bracketSize = (N % 2 === 1) ? N + 1 : N;
-  const order = seedOrder(bracketSize);
-  const ids = teams.rows.map(t => t.id);
-  const placed = Array(bracketSize).fill(null);
-  for (let i = 0; i < N; i++) placed[order[i] - 1] = ids[i];
-
-  const rounds = Math.log2(ceilPow2(bracketSize));
-  let prevIds = [];
-  for (let r = 1; r <= rounds; r++) {
-    const roundMatches = [];
-    for (let i = 0; i < bracketSize / Math.pow(2, r); i++) {
-      const a = r === 1 ? placed[i * 2] : null;
-      const b = r === 1 ? placed[i * 2 + 1] : null;
-      const ins = await query(
-        'INSERT INTO matches (round, position, team_a, team_b) VALUES ($1,$2,$3,$4) RETURNING id',
-        [r, i + 1, a, b]
-      );
-      roundMatches.push(ins.rows[0].id);
-    }
-    prevIds.push(roundMatches);
-  }
-
-  // BYEを勝者として自動進出
-  const byeMatches = await query('SELECT * FROM matches WHERE round=1');
-  for (const m of byeMatches.rows) {
-    if (m.team_a && !m.team_b) await advanceWinner(m.id, m.team_a);
-    if (!m.team_a && m.team_b) await advanceWinner(m.id, m.team_b);
-  }
-
-  await query("UPDATE tournament SET status='live'");
-  broadcast();
-  res.json({ ok: true });
+// 削除（誤登録用／パス必要）
+app.delete('/api/entries/:id', requirePass, async (req, res) => {
+  await query('DELETE FROM entries WHERE id=$1', [req.params.id]);
+  io.emit('entries:update');
+  ok(res, { ok: true });
 });
 
-async function advanceWinner(matchId, winnerId) {
-  await query('UPDATE matches SET winner=$1 WHERE id=$2', [winnerId, matchId]);
-  const m = await query('SELECT * FROM matches WHERE id=$1', [matchId]);
-  const match = m.rows[0];
-  const next = await query('SELECT * FROM matches WHERE round=$1 AND position=$2', [match.round + 1, Math.ceil(match.position / 2)]);
-  if (next.rowCount) {
-    const nextMatch = next.rows[0];
-    const slot = (match.position % 2 === 1) ? 'team_a' : 'team_b';
-    await query(`UPDATE matches SET ${slot}=$1 WHERE id=$2`, [winnerId, nextMatch.id]);
-  }
-}
+// 一括リセット（パス必要・任意）
+app.post('/api/reset', requirePass, async (_req, res) => {
+  await query('TRUNCATE entries RESTART IDENTITY');
+  io.emit('entries:update');
+  ok(res, { ok: true });
+});
 
-// 勝敗確定
-app.post('/api/match/:id/win', requireAdmin, async (req, res) => {
-  const { winner } = req.body;
-  await advanceWinner(req.params.id, winner);
-  broadcast();
-  res.json({ ok: true });
+/* ========== Socket.IO ========== */
+io.on('connection', (socket) => {
+  socket.emit('hello', 'connected');
 });
 
 server.listen(PORT, async () => {
   await initDb();
-  console.log(`Server running on :${PORT}`);
+  console.log(`Server on :${PORT}`);
 });
