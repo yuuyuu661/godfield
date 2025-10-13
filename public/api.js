@@ -64,5 +64,4 @@ const API = {
     return r.json();
   }
 };
-
 export default API;
