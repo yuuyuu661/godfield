@@ -1,28 +1,20 @@
-export async function getState() {
-  const r = await fetch('/api/state');
+export async function listEntries() {
+  const r = await fetch('/api/entries');
   return r.json();
 }
-export async function addTeam(payload) {
-  const r = await fetch('/api/teams', {
+export async function addEntry(payload) {
+  const r = await fetch('/api/entries', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
+  if (!r.ok) throw new Error((await r.json()).error || 'addEntry failed');
   return r.json();
 }
-export async function startTournament(password) {
-  const r = await fetch('/api/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password })
+export async function deleteEntry(id, password) {
+  const r = await fetch(`/api/entries/${id}?password=${encodeURIComponent(password)}`, {
+    method: 'DELETE'
   });
-  return r.json();
-}
-export async function setWinner(id, winner, password) {
-  const r = await fetch(`/api/match/${id}/win`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ winner, password })
-  });
+  if (!r.ok) throw new Error((await r.json()).error || 'deleteEntry failed');
   return r.json();
 }
