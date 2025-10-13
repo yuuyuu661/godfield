@@ -1,17 +1,16 @@
 import pg from 'pg';
 const { Pool } = pg;
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.PGSSL_DISABLE === '1' ? false : { rejectUnauthorized: false }
 });
 
 export async function query(q, params) {
-  const client = await pool.connect();
+  const c = await pool.connect();
   try {
-    const res = await client.query(q, params);
-    return res;
+    return await c.query(q, params);
   } finally {
-    client.release();
+    c.release();
   }
 }
