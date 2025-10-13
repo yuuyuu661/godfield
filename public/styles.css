@@ -1,15 +1,25 @@
-body { font-family: "Noto Sans JP", sans-serif; background: #fafafa; margin: 20px; }
-h1 { text-align: center; }
-section { margin: 16px auto; max-width: 900px; }
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Yu Gothic", sans-serif; margin: 16px; }
+header { margin-bottom: 12px; }
+h1 { margin: 0; font-size: 1.6rem; }
+.sub { opacity: .8; margin: 4px 0 0; }
 
-#bracket { overflow-x: auto; border: 1px solid #ccc; padding: 10px; border-radius: 12px; background: white; }
+.grid { display: grid; grid-template-columns: 420px 1fr; gap: 16px; align-items: start; }
+.card { border: 1px solid #bbb; border-radius: 12px; padding: 12px; background: rgba(255,255,255,.04); }
 
-/* 線 */
-.slot { fill: none; stroke: #333; stroke-width: 2; }
-.slot.a { stroke: #333; }
-.slot.b { stroke: #333; }
-.slot.win { stroke: #ff3333; stroke-width: 4; }
+label { display: block; margin: 6px 0; font-size: .95rem; }
+input, button { padding: 8px 10px; border: 1px solid #bbb; border-radius: 8px; background: transparent; }
+button { cursor: pointer; }
+button:hover { filter: brightness(1.1); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
 
-/* ボックス */
-.box { fill: #fff; stroke: #8aaee0; stroke-width: 1.5; rx: 8; }
-.team-text { font-size: 12px; }
+.mt8 { margin-top: 8px; }
+
+#list { display: grid; gap: 8px; }
+.row-item { display: grid; grid-template-columns: 48px 1fr 1.2fr 160px; gap: 8px;
+  border: 1px dashed #aaa; border-radius: 10px; padding: 8px; align-items: center; }
+.id { font-weight: 700; text-align: center; }
+.team { font-weight: 700; }
+.members { opacity: .9; font-size: .95rem; }
+.time { opacity: .8; font-size: .85rem; text-align: right; }
