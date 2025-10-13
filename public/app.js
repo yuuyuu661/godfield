@@ -1,84 +1,127 @@
-import { getState, listTeams, createTeam, deleteTeam, startTournament, resetTournament, decideWinner } from './api.js';
+import API from './api.js';
 import { renderBracket } from './bracket.js';
 
-const socket = io();
-let STATE = { tournament:{}, teams:[], matches:[] };
+const $ = (s) => document.querySelector(s);
 
-socket.on('state', (st) => {
-  STATE = st;
-  render();
-});
+async function refresh() {
+  const state = await API.getState();
+  const status = state.tournament?.status || 'registering';
+  $('#status').textContent = `状態: ${status}`;
+  renderTeams(state.teams);
 
-async function render() {
-  document.getElementById('status').textContent = `状態: ${STATE.tournament.status}`;
-  renderTeams();
-  renderBracket(document.getElementById('bracket'), STATE, onClickMatch);
-}
-
-function renderTeams() {
-  const el = document.getElementById('teams');
-  el.innerHTML = '';
-  STATE.teams.forEach(t => {
-    const box = document.getElementById('team-item').content.firstElementChild.cloneNode(true);
-    box.querySelector('.team-name').textContent = t.name;
-    box.querySelector('.team-members').textContent = [t.member1, t.member2, t.member3].filter(Boolean).join(' / ');
-    el.appendChild(box);
+  renderBracket('#bracket', state, async (m) => {
+    const pw = $('#admin-pass').value;
+    if ((state.tournament?.status || '') !== 'live') return;
+    if (!m.team_a && !m.team_b) return;
+    const choice = await pickWinnerDialog(m, state.teams);
+    if (!choice) return;
+    try {
+      await API.decideWinner(pw, m.id, choice);
+      await refresh();
+    } catch (e) {
+      alert(e.message || e);
+    }
   });
 }
 
-document.getElementById('team-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const fd = new FormData(e.currentTarget);
-  const payload = Object.fromEntries(fd.entries());
+function renderTeams(teams) {
+  const list = $('#teams');
+  list.innerHTML = '';
+  teams.forEach(t => {
+    const li = document.createElement('li');
+    li.className = 'team';
+    li.innerHTML = `
+      <div class="team-name">${escapeHtml(t.name)}</div>
+      <div class="team-mems">${[t.member1, t.member2, t.member3].filter(Boolean).map(escapeHtml).join(' / ')}</div>
+      <button class="danger small del">削除</button>
+    `;
+    li.querySelector('.del').addEventListener('click', async () => {
+      const pw = $('#admin-pass').value;
+      if (!pw) return alert('管理パスワードを入力してください');
+      if (!confirm(`「${t.name}」を削除します。よろしいですか？`)) return;
+      try {
+        await API.deleteTeam(pw, t.id);
+        await refresh();
+      } catch (e) {
+        alert(e.message || e);
+      }
+    });
+    list.appendChild(li);
+  });
+}
+
+function escapeHtml(s) {
+  return (s ?? '').toString().replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function pickWinnerDialog(m, teams) {
+  const a = teams.find(t => t.id === m.team_a);
+  const b = teams.find(t => t.id === m.team_b);
+  const nameA = a ? a.name : '(空き)';
+  const nameB = b ? b.name : '(空き)';
+
+  const choice = prompt(`[R${m.round} #${m.position}] 勝者を入力してください:\nA: ${nameA}\nB: ${nameB}\n(A/B/キャンセル)`, 'A');
+  if (!choice) return null;
+  if (/^a$/i.test(choice) && a) return a.id;
+  if (/^b$/i.test(choice) && b) return b.id;
+  return null;
+}
+
+// ボタン
+$('#add-team').addEventListener('click', async () => {
+  const pw = $('#admin-pass').value;
+  if (!pw) return alert('管理パスワードを入力してください');
+  const name = $('#team-name').value.trim();
+  if (!name) return alert('チーム名を入力してください');
+  const member1 = $('#mem1').value.trim();
+  const member2 = $('#mem2').value.trim();
+  const member3 = $('#mem3').value.trim();
   try {
-    await createTeam(payload);
-    e.currentTarget.reset();
-  } catch (err) {
-    alert(err.message || err);
-  }
-});
-
-document.getElementById('start-btn').addEventListener('click', async () => {
-  const password = document.getElementById('admin-pass').value;
-  if (!password) return alert('管理パスワードを入力してください');
-  try {
-    await startTournament(password);
-  } catch (e) { alert(e.message || e); }
-});
-
-document.getElementById('reset-btn').addEventListener('click', async () => {
-  const password = document.getElementById('admin-pass').value;
-  if (!password) return alert('管理パスワードを入力してください');
-  if (!confirm('本当に全リセットしますか？')) return;
-  try { await resetTournament(password); } catch (e) { alert(e.message || e); }
-});
-
-async function onClickMatch(m) {
-  if (STATE.tournament.status !== 'live') return;
-  if (!m.team_a && !m.team_b) return;
-  const options = [];
-  if (m.team_a) options.push({ id: m.team_a, name: nameOf(m.team_a) });
-  if (m.team_b) options.push({ id: m.team_b, name: nameOf(m.team_b) });
-
-  const choice = prompt(`勝者を入力してください: ${options.map(o=>`${o.id}:${o.name}`).join(' / ')}`);
-  if (!choice) return;
-  const winnerId = Number(choice.trim());
-  if (!options.some(o=>o.id===winnerId)) return alert('そのチームIDはこの試合に存在しません');
-
-  const password = document.getElementById('admin-pass').value;
-  if (!password) return alert('管理パスワードを入力してください');
-
-  try {
-    await decideWinner(m.id, winnerId, password);
+    await API.createTeam(pw, { name, member1, member2, member3 });
+    $('#team-name').value = '';
+    $('#mem1').value = '';
+    $('#mem2').value = '';
+    $('#mem3').value = '';
+    await refresh();
   } catch (e) {
     alert(e.message || e);
   }
-}
+});
 
-function nameOf(id) {
-  const t = STATE.teams.find(x=>x.id===id);
-  return t ? t.name : '(不明)';
-}
+$('#start-btn').addEventListener('click', async () => {
+  const pw = $('#admin-pass').value;
+  if (!pw) return alert('管理パスワードを入力してください');
+  const size = Number($('#target-size').value || '26');
+  try {
+    await API.startTournament(pw, size);
+    await refresh();
+  } catch (e) {
+    alert(e.message || e);
+  }
+});
 
-// 初期ロード（Socketのstateまでの間を埋める）
-getState().then((st) => { STATE = st; render(); });
+$('#go-live-btn').addEventListener('click', async () => {
+  const pw = $('#admin-pass').value;
+  if (!pw) return alert('管理パスワードを入力してください');
+  try {
+    await API.goLive(pw);
+    await refresh();
+  } catch (e) {
+    alert(e.message || e);
+  }
+});
+
+$('#reset-btn').addEventListener('click', async () => {
+  const pw = $('#admin-pass').value;
+  if (!pw) return alert('管理パスワードを入力してください');
+  if (!confirm('全データをリセットします。よろしいですか？')) return;
+  try {
+    await API.resetTournament(pw);
+    await refresh();
+  } catch (e) {
+    alert(e.message || e);
+  }
+});
+
+// 初期ロード
+refresh();
