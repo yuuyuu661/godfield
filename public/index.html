@@ -1,59 +1,27 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>リアルタイム・トーナメント表</title>
-  <link rel="stylesheet" href="/styles.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>トーナメント表</title>
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <header>
-    <h1>リアルタイム・トーナメント表</h1>
-    <div id="status"></div>
-  </header>
+  <h1>🏆 トーナメント表</h1>
+  <section>
+    <form id="team-form">
+      <input name="name" placeholder="チーム名" required>
+      <input name="member1" placeholder="メンバー1">
+      <input name="member2" placeholder="メンバー2">
+      <input name="member3" placeholder="メンバー3">
+      <input name="password" type="password" placeholder="管理パスワード" required>
+      <button type="submit">登録</button>
+    </form>
+    <button id="start">大会開始</button>
+  </section>
 
-  <main class="grid">
-    <section class="card">
-      <h2>チーム登録（管理者）</h2>
-      <form id="team-form">
-        <label>チーム名 <input name="name" required></label>
-        <div class="row">
-          <label>メンバー1 <input name="member1"></label>
-          <label>メンバー2 <input name="member2"></label>
-          <label>メンバー3 <input name="member3"></label>
-        </div>
-        <label>管理パスワード <input name="password" type="password" required></label>
-        <button type="submit">登録</button>
-      </form>
-      <div id="teams"></div>
-    </section>
-
-    <section class="card">
-      <h2>大会操作（管理者）</h2>
-      <div class="row">
-        <input id="admin-pass" type="password" placeholder="管理パスワード">
-        <button id="start-btn">大会開始</button>
-        <button id="reset-btn">リセット</button>
-      </div>
-    </section>
-
-    <section class="card wide">
-      <h2>トーナメント表</h2>
-      <div id="bracket"></div>
-      <div id="legend">
-        <span class="leg leg-a">A側</span>
-        <span class="leg leg-b">B側</span>
-        <span class="leg leg-win">勝者</span>
-      </div>
-    </section>
-  </main>
-
-  <template id="team-item">
-    <div class="team">
-      <div class="team-name"></div>
-      <div class="team-members"></div>
-    </div>
-  </template>
+  <section id="teams"></section>
+  <section id="bracket"></section>
 
   <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="/api.js"></script>
