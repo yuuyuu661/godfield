@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS tournament (
   id SERIAL PRIMARY KEY,
   title TEXT NOT NULL DEFAULT 'Tournament',
-  status TEXT NOT NULL DEFAULT 'registering', -- registering | live | finished
+  status TEXT NOT NULL DEFAULT 'registering',
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -16,12 +16,12 @@ CREATE TABLE IF NOT EXISTS teams (
 
 CREATE TABLE IF NOT EXISTS matches (
   id SERIAL PRIMARY KEY,
-  round INT NOT NULL,        -- 1 = Round of N (初戦)
-  position INT NOT NULL,     -- 同ラウンド内の並び順
+  round INT NOT NULL,
+  position INT NOT NULL,
   team_a INT REFERENCES teams(id) ON DELETE SET NULL,
   team_b INT REFERENCES teams(id) ON DELETE SET NULL,
   winner INT REFERENCES teams(id) ON DELETE SET NULL,
   next_match_id INT REFERENCES matches(id) ON DELETE SET NULL,
-  next_is_a BOOLEAN,         -- 勝者は次の試合のA枠に入るか？
+  next_is_a BOOLEAN,
   UNIQUE(round, position)
 );
