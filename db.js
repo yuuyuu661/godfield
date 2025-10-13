@@ -1,27 +1,24 @@
-import pg from 'pg';
+// PostgreSQL接続（Railway想定）
+const { Pool } = require('pg');
 
-const { Pool } = pg;
+const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/postgres';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.PGSSL_DISABLE === '1' ? false : { rejectUnauthorized: false }
+  connectionString,
+  ssl: process.env.PGSSL === 'disable' ? false : { rejectUnauthorized: false }
 });
 
-export async function query(q, params) {
-  const client = await pool.connect();
-  try {
-    const res = await client.query(q, params);
-    return res;
-  } finally {
-    client.release();
-  }
+async function query(text, params) {
+  const res = await pool.query(text, params);
+  return res;
 }
 
-export async function tx(run) {
+// トランザクション実行ヘルパ
+async function tx(fn) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const result = await run(client);
+    const result = await fn(client);
     await client.query('COMMIT');
     return result;
   } catch (e) {
@@ -31,3 +28,5 @@ export async function tx(run) {
     client.release();
   }
 }
+
+module.exports = { pool, query, tx };
