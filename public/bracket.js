@@ -1,4 +1,4 @@
-// シンプルなSVG描画（モバイルで黒背景にならない＆拡大縮小しやすい）
+// モバイルで見やすいレスポンシブSVGの描画
 export function renderBracket(container, state, onClickMatch) {
   const el = typeof container === 'string' ? document.querySelector(container) : container;
   el.innerHTML = '';
@@ -10,13 +10,9 @@ export function renderBracket(container, state, onClickMatch) {
   }
 
   const byRound = {};
-  for (const m of matches) {
-    (byRound[m.round] ||= []).push(m);
-  }
-  const rounds = Object.keys(byRound).map(n => Number(n)).sort((a, b) => a - b);
-  for (const r of rounds) {
-    byRound[r].sort((a, b) => a.position - b.position);
-  }
+  for (const m of matches) (byRound[m.round] ||= []).push(m);
+  const rounds = Object.keys(byRound).map(Number).sort((a, b) => a - b);
+  for (const r of rounds) byRound[r].sort((a, b) => a.position - b.position);
 
   const colW = 260;
   const rowH = 84;
@@ -31,26 +27,21 @@ export function renderBracket(container, state, onClickMatch) {
   const teamsById = {};
   (state.teams || []).forEach(t => (teamsById[t.id] = t));
 
-  // 線を先に、ボックスを後に描く
-  // 線
+  // コネクタ線
   for (const r of rounds) {
-    const isLast = (r === rounds[rounds.length - 1]);
-    if (isLast) continue;
+    if (r === rounds[rounds.length - 1]) continue; // 最終ラウンドは線なし
     const nextR = r + 1;
-
     for (const m of byRound[r]) {
       const x1 = marginX + (r - 1) * colW + 200;
       const y1 = marginY + (m.position - 1 + 0.5) * rowH;
-
       const nextPos = Math.ceil(m.position / 2);
       const x2 = marginX + (nextR - 1) * colW + 30;
       const y2 = marginY + (nextPos - 1 + 0.5) * rowH;
-
       svg.appendChild(line(x1, y1, x2, y2, 'slot'));
     }
   }
 
-  // ボックス
+  // 各マッチ
   for (const r of rounds) {
     for (const m of byRound[r]) {
       const x = marginX + (r - 1) * colW + 20;
@@ -76,7 +67,6 @@ function matchBox(x, y, m, teamsById, onClickMatch) {
   const rect = svgEl('rect', { width: 200, height: 68, class: 'box', rx: 10, ry: 10 });
   g.appendChild(rect);
 
-  // A
   const a = teamsById[m.team_a]?.name || (m.team_a ? `#${m.team_a}` : '(空き)');
   const b = teamsById[m.team_b]?.name || (m.team_b ? `#${m.team_b}` : '(空き)');
 
@@ -91,7 +81,6 @@ function matchBox(x, y, m, teamsById, onClickMatch) {
   // クリックで勝者確定（live中のみ）
   g.addEventListener('click', () => onClickMatch?.(m));
 
-  // winner表示
   if (m.winner) {
     const mark = svgEl('text', { x: 198, y: 16, class: 'winmark', 'text-anchor': 'end' });
     mark.textContent = 'WIN';
