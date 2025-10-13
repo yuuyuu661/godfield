@@ -1,5 +1,4 @@
 import pg from 'pg';
-
 const { Pool } = pg;
 
 const pool = new Pool({
@@ -12,21 +11,6 @@ export async function query(q, params) {
   try {
     const res = await client.query(q, params);
     return res;
-  } finally {
-    client.release();
-  }
-}
-
-export async function tx(run) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const result = await run(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
   } finally {
     client.release();
   }
