@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>32チーム・トーナメント</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>32チーム・シングルエリミネーション</h1>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="bracket">トーナメント</button>
+    <button class="tab" data-tab="roulette">ルーレット</button>
+  </nav>
+
+  <section id="admin" data-tab-panel="bracket">
+    <details open>
+      <summary>管理パネル</summary>
+      <div class="admin-grid">
+        <label>管理パスワード <input id="pass" type="password" placeholder="••••" /></label>
+        <div class="seed-actions">
+          <button id="clearSeeds" class="danger">配置クリア</button>
+          <button id="resetResults" class="danger">勝敗リセット</button>
+        </div>
+        <div><small>1回戦：<b>左クリック＝勝者</b>／<b>右クリック or 長押し＝チーム名登録/編集</b></small></div>
+      </div>
+    </details>
+  </section>
+
+  <main id="bracket" data-tab-panel="bracket">
+    <svg id="wires" aria-hidden="true"></svg>
+    <div id="cols" class="columns"></div>
+  </main>
+
+  <section id="roulette" data-tab-panel="roulette" hidden>
+    <div class="roulette-wrap">
+      <div class="wheel-area">
+        <canvas id="wheel" width="420" height="420"></canvas>
+        <div class="pointer">▼</div>
+        <audio id="sfxSpin" src="/sfx/spin.mp3" preload="auto"></audio>
+        <audio id="sfxStop" src="/sfx/stop.mp3" preload="auto"></audio>
+      </div>
+      <div class="controls">
+        <label>項目（カンマ区切り）</label>
+        <textarea id="items" rows="6"></textarea>
+        <div class="btns">
+          <button id="preset32">1〜32をセット</button>
+          <button id="spin">SPIN!</button>
+          <button id="spinRemove">SPIN!（出目を削除）</button>
+        </div>
+        <div id="result"></div>
+        <div id="pending" class="pending"></div>
+      </div>
+    </div>
+  </section>
+
+  <template id="matchTpl">
+    <div class="match" data-match>
+      <div class="row" data-side="A">
+        <span class="seed"></span>
+        <span class="name">--</span>
+      </div>
+      <div class="row" data-side="B">
+        <span class="seed"></span>
+        <span class="name">--</span>
+      </div>
+    </div>
+  </template>
+
+  <script src="/app.js"></script>
+</body>
+</html>
