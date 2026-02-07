@@ -51,7 +51,10 @@ function computeBracket(state) {
     const m = all.find(x => x.id === id);
     let a = m.aSeed ? teamAtSeed(m.aSeed, slots) : winnerOf(m.aFrom);
     let b = m.bSeed ? teamAtSeed(m.bSeed, slots) : winnerOf(m.bFrom);
-    const pick = results[id];
+
+    const r = results[id];
+    const pick = typeof r === "string" ? r : r?.winner;
+
     if (pick === "A") return a || null;
     if (pick === "B") return b || null;
     return null;
@@ -60,7 +63,8 @@ function computeBracket(state) {
   const resolved = all.map(m => {
     const aName = m.aSeed ? teamAtSeed(m.aSeed, slots) : winnerOf(m.aFrom);
     const bName = m.bSeed ? teamAtSeed(m.bSeed, slots) : winnerOf(m.bFrom);
-    const winner = results[m.id] || null;
+    const r = results[m.id];
+    const winner = typeof r === "string" ? r : r?.winner || null;
     return { id: m.id, aSeed: m.aSeed || null, bSeed: m.bSeed || null, aFrom: m.aFrom || null, bFrom: m.bFrom || null, aName: aName || null, bName: bName || null, winner };
   });
 
@@ -125,3 +129,27 @@ app.get("*", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on :${PORT}`));
+
+app.post("/api/results/set-bo3", auth, async (req, res) => {
+  const { matchId, games, winner } = req.body;
+
+  if (!/^m\d+$/.test(matchId))
+    return res.status(400).json({ error: "Bad matchId" });
+
+  if (!Array.isArray(games) || games.length === 0)
+    return res.status(400).json({ error: "Games required" });
+
+  if (!(winner === "A" || winner === "B"))
+    return res.status(400).json({ error: "Winner must be A or B" });
+
+  await db.read();
+
+  // ★ BO3結果を保存
+  db.data.results[matchId] = {
+    games,
+    winner
+  };
+
+  await db.write();
+  res.json({ ok: true, results: db.data.results });
+});
