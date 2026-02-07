@@ -57,7 +57,7 @@ function render(data) {
     id: m.id, aSeed: m.aSeed, bSeed: m.bSeed,
     aName: slots[m.aSeed - 1] || "--",
     bName: slots[m.bSeed - 1] || "--",
-    winner: data.results[m.id] || null
+    winner: data.results[m.id]?.winner || null
   }));
 
   const resolved = Object.fromEntries(data.bracket.resolved.map(m => [m.id, m]));
@@ -68,7 +68,7 @@ function render(data) {
       const B = resolved[m.bFrom];
       const aN = (A && A.winner) ? (A.winner === "A" ? A.aName : A.bName) : "--";
       const bN = (B && B.winner) ? (B.winner === "A" ? B.aName : B.bName) : "--";
-      return { id: m.id, aName: aN, bName: bN, winner: data.results[m.id] || null, aFrom: m.aFrom, bFrom: m.bFrom };
+      return { id: m.id, aName: aN, bName: bN, winner: data.results[m.id]?.winner || null, aFrom: m.aFrom, bFrom: m.bFrom };
     });
   }
 
