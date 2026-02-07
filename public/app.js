@@ -103,7 +103,7 @@ function renderRound(col, matches, firstRound) {
         const side = row.dataset.side;
         const name = row.querySelector(".name").textContent;
         if (!name || name === "--") return;
-        setResult(m.id, side);
+        openBo3Modal(m.id, m.aName, m.bName);
       });
     });
 
@@ -269,6 +269,42 @@ function indexAtPointer(n, rotation) {
   return Math.floor(angle / seg) % n;
 }
 
+function openBo3Modal(matchId, aName, bName) {
+  if (!state.pass) return alert("管理パスワードが必要です");
+
+  const tpl = document.importNode($("#bo3Tpl").content, true);
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.appendChild(tpl);
+
+  const inputs = $$("input", modal);
+
+  modal.addEventListener("click", async (e) => {
+    if (e.target.dataset.action === "cancel") {
+      modal.remove();
+    }
+    if (e.target.dataset.action === "save") {
+      const games = [];
+      for (let i = 0; i < 3; i++) {
+        const a = Number(inputs[i*2].value);
+        const b = Number(inputs[i*2+1].value);
+        if (!isNaN(a) && !isNaN(b)) {
+          games.push({ a, b });
+        }
+      }
+
+      await api("/api/results/set-bo3", {
+        method: "POST",
+        body: JSON.stringify({ matchId, games })
+      });
+
+      modal.remove();
+      load();
+    }
+  });
+
+  document.body.appendChild(modal);
+}
 let spinning = false;
 let pendingRemoval = null; // value scheduled to be removed on next "SPIN!(出目を削除)"
 function updatePending() {
