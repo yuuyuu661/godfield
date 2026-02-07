@@ -301,10 +301,14 @@ function openBo3Modal(matchId, aName, bName) {
   const inputs = $$("input", modal);
 
   modal.addEventListener("click", async (e) => {
-    if (e.target.dataset.action === "cancel") {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+
+    if (btn.dataset.action === "cancel") {
       modal.remove();
     }
-    if (e.target.dataset.action === "save") {
+
+    if (btn.dataset.action === "save") {
       const games = [];
 
       for (let i = 0; i < 3; i++) {
@@ -316,10 +320,7 @@ function openBo3Modal(matchId, aName, bName) {
       }
 
       const winner = decideWinner(games);
-
-      if (!winner) {
-        return alert("まだ勝者が決まっていません（2勝先取）");
-      }
+      if (!winner) return alert("まだ勝者が決まっていません");
 
       await api("/api/results/set-bo3", {
         method: "POST",
