@@ -68,7 +68,14 @@ function render(data) {
       const B = resolved[m.bFrom];
       const aN = (A && A.winner) ? (A.winner === "A" ? A.aName : A.bName) : "--";
       const bN = (B && B.winner) ? (B.winner === "A" ? B.aName : B.bName) : "--";
-      return { id: m.id, aName: aN, bName: bN, winner: data.results[m.id]?.winner || null, aFrom: m.aFrom, bFrom: m.bFrom };
+      return {
+        id: m.id,
+        aName: aN,
+        bName: bN,
+        winner: data.results[m.id]?.winner || null,
+        aFrom: m.aFrom,
+        bFrom: m.bFrom
+      };
     });
   }
 
