@@ -42,6 +42,27 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .controls .btns { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
 #result { margin-top: 10px; font-weight: 700; }
 .pending { margin-top: 6px; font-size: 13px; color: #444; background: #fff7e6; border:1px solid #ffd699; padding:6px 8px; border-radius: 6px; display: none; }
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.4);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+
+.bo3 {
+  background: #fff;
+  padding: 16px;
+  border-radius: 12px;
+  width: 320px;
+}
+
+.game {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0;
+}
 
 /* Mobile */
 @media (max-width: 768px) {
