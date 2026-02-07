@@ -53,13 +53,17 @@ function render(data) {
     return col;
   };
 
-  const r1 = data.bracket.map.round1.map(m => ({
-    id: m.id, aSeed: m.aSeed, bSeed: m.bSeed,
-    aName: slots[m.aSeed - 1] || "--",
-    bName: slots[m.bSeed - 1] || "--",
+  const r1 = data.bracket.map.round1.map(m => {
     const r = data.results[m.id];
-    winner: typeof r === "string" ? r : r?.winner || null
-  }));
+    return {
+      id: m.id,
+      aSeed: m.aSeed,
+      bSeed: m.bSeed,
+      aName: slots[m.aSeed - 1] || "--",
+      bName: slots[m.bSeed - 1] || "--",
+      winner: typeof r === "string" ? r : r?.winner || null
+    };
+  });
 
   const resolved = Object.fromEntries(data.bracket.resolved.map(m => [m.id, m]));
 
@@ -69,12 +73,14 @@ function render(data) {
       const B = resolved[m.bFrom];
       const aN = (A && A.winner) ? (A.winner === "A" ? A.aName : A.bName) : "--";
       const bN = (B && B.winner) ? (B.winner === "A" ? B.aName : B.bName) : "--";
+
+      const r = data.results[m.id];
+
       return {
         id: m.id,
         aName: aN,
         bName: bN,
-        const r = data.results[m.id];
-        winner: typeof r === "string" ? r : r?.winner || null
+        winner: typeof r === "string" ? r : r?.winner || null,
         aFrom: m.aFrom,
         bFrom: m.bFrom
       };
