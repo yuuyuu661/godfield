@@ -70,6 +70,39 @@
     </div>
   </template>
 
+  <template id="bo3Tpl">
+    <div class="bo3">
+      <h3>BO3 スコア入力</h3>
+
+      <div class="games">
+        <div class="game">
+          <span>Game 1</span>
+          <input type="number" min="0" data-side="A" />
+          -
+          <input type="number" min="0" data-side="B" />
+        </div>
+        <div class="game">
+          <span>Game 2</span>
+          <input type="number" min="0" data-side="A" />
+          -
+          <input type="number" min="0" data-side="B" />
+        </div>
+        <div class="game">
+          <span>Game 3</span>
+          <input type="number" min="0" data-side="A" />
+          -
+          <input type="number" min="0" data-side="B" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button data-action="save">保存</button>
+        <button data-action="cancel">キャンセル</button>
+      </div>
+    </div>
+  </template>
+
+
   <script src="/app.js"></script>
 </body>
 </html>
