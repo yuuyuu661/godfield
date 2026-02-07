@@ -158,6 +158,20 @@ async function setResult(matchId, winner) {
   try { await api("/api/results/set", { method: "POST", body: JSON.stringify({ matchId, winner }) }); await load(); }
   catch (e) { alert(e.message); }
 }
+function decideWinner(games) {
+  let winA = 0;
+  let winB = 0;
+
+  for (const g of games) {
+    if (g.a > g.b) winA++;
+    if (g.b > g.a) winB++;
+
+    if (winA === 2) return "A";
+    if (winB === 2) return "B";
+  }
+
+  return null;
+}
 
 $("#clearSeeds").addEventListener("click", () => {
   if (!state.pass) return alert("管理パスワードが必要です");
