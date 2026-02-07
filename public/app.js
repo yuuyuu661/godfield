@@ -57,7 +57,8 @@ function render(data) {
     id: m.id, aSeed: m.aSeed, bSeed: m.bSeed,
     aName: slots[m.aSeed - 1] || "--",
     bName: slots[m.bSeed - 1] || "--",
-    winner: data.results[m.id]?.winner || null
+    const r = data.results[m.id];
+    winner: typeof r === "string" ? r : r?.winner || null
   }));
 
   const resolved = Object.fromEntries(data.bracket.resolved.map(m => [m.id, m]));
@@ -72,7 +73,8 @@ function render(data) {
         id: m.id,
         aName: aN,
         bName: bN,
-        winner: data.results[m.id]?.winner || null,
+        const r = data.results[m.id];
+        winner: typeof r === "string" ? r : r?.winner || null
         aFrom: m.aFrom,
         bFrom: m.bFrom
       };
