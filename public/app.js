@@ -306,6 +306,7 @@ function openBo3Modal(matchId, aName, bName) {
     }
     if (e.target.dataset.action === "save") {
       const games = [];
+
       for (let i = 0; i < 3; i++) {
         const a = Number(inputs[i*2].value);
         const b = Number(inputs[i*2+1].value);
@@ -314,9 +315,15 @@ function openBo3Modal(matchId, aName, bName) {
         }
       }
 
+      const winner = decideWinner(games);
+
+      if (!winner) {
+        return alert("まだ勝者が決まっていません（2勝先取）");
+      }
+
       await api("/api/results/set-bo3", {
         method: "POST",
-        body: JSON.stringify({ matchId, games })
+        body: JSON.stringify({ matchId, games, winner })
       });
 
       modal.remove();
