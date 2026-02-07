@@ -103,6 +103,41 @@ function renderRound(col, matches, firstRound) {
     a.querySelector(".seed").textContent = firstRound ? String(m.aSeed) : "";
     b.querySelector(".seed").textContent = firstRound ? String(m.bSeed) : "";
 
+    const scoresEl = tpl.querySelector(".bo3-scores");
+        if (scoresEl) {
+          scoresEl.innerHTML = "";
+
+          const r = state.data.results[m.id];
+          const games = r?.games || [];
+
+          // 最大3試合分表示（なければ 0-0）
+          for (let i = 0; i < 3; i++) {
+            const g = games[i] || { a: 0, b: 0 };
+            scoresEl.insertAdjacentHTML(
+              "beforeend",
+              `<div class="game">
+                 <span>${g.a}</span>
+                 <span>${g.b}</span>
+               </div>`
+            );
+          }
+
+          // セットカウント（2-0 など）
+          let winA = 0, winB = 0;
+          games.forEach(g => {
+            if (g.a > g.b) winA++;
+            if (g.b > g.a) winB++;
+          });
+
+          scoresEl.insertAdjacentHTML(
+            "beforeend",
+            `<div class="summary">
+               <span>${winA}</span>
+               <span>${winB}</span>
+             </div>`
+          );
+        }
+
     [a, b].forEach((row) => {
       row.addEventListener("click", (ev) => {
         ev.preventDefault();
