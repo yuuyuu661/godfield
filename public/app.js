@@ -71,6 +71,7 @@ function render(data) {
     return list.map(m => {
       const A = resolved[m.aFrom];
       const B = resolved[m.bFrom];
+
       const aN = (A && A.winner) ? (A.winner === "A" ? A.aName : A.bName) : "--";
       const bN = (B && B.winner) ? (B.winner === "A" ? B.aName : B.bName) : "--";
 
@@ -81,6 +82,11 @@ function render(data) {
         aName: aN,
         bName: bN,
         winner: typeof r === "string" ? r : r?.winner || null,
+
+        // 👇これ追加（超重要）
+        aSeed: m.aSeed || null,
+        bSeed: m.bSeed || null,
+
         aFrom: m.aFrom,
         bFrom: m.bFrom
       };
