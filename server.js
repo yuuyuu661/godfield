@@ -15,15 +15,37 @@ app.use(express.json());
 const dbFile = path.join(__dirname, "db.json");
 const adapter = new JSONFile(dbFile);
 
-// 👇 slotsはそのまま共通でOK
 const db = new Low(adapter, {
   teams: [],
-  slots: Array(10).fill(null),
+  upperSlots: Array(32).fill(null),
+  lowerSlots: Array(32).fill(null),
   results: {}
 });
 
 await db.read();
-if (!db.data) db.data = { teams: [], slots: Array(10).fill(null), results: {} };
+
+if (!db.data) {
+  db.data = {
+    teams: [],
+    upperSlots: Array(32).fill(null),
+    lowerSlots: Array(32).fill(null),
+    results: {}
+  };
+}
+
+// 旧データ移行
+if (!db.data.upperSlots) {
+  db.data.upperSlots = Array.isArray(db.data.slots)
+    ? [...db.data.slots, ...Array(Math.max(0, 32 - db.data.slots.length)).fill(null)].slice(0, 32)
+    : Array(32).fill(null);
+}
+if (!db.data.lowerSlots) {
+  db.data.lowerSlots = Array(32).fill(null);
+}
+if (!db.data.results) db.data.results = {};
+if (!db.data.teams) db.data.teams = [];
+delete db.data.slots;
+
 await db.write();
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "yamada";
@@ -34,14 +56,9 @@ const auth = (req, res, next) => {
   next();
 };
 
-//
-// =========================
-// 🧠 トーナメント構造
-// =========================
-//
 function matchMap() {
   return {
-    // ===== 勝者側 =====
+    // ===== 勝者側（今まで通り）=====
     upper: {
       round1: [
         { id: "m1", aSeed: 1, bSeed: 2 }
@@ -61,7 +78,8 @@ function matchMap() {
       ]
     },
 
-    // ===== 敗者側（完全手動）=====
+    // ===== 敗者側（完全手動・完全独立）=====
+    // 1回戦 1個 / 2回戦 2個 / 準決勝 2個 / 決勝 1個
     lower: {
       round1: [
         { id: "l1", aSeed: 1, bSeed: 2 }
@@ -71,29 +89,25 @@ function matchMap() {
         { id: "l3", aSeed: 5, bSeed: 6 }
       ],
       semis: [
-        { id: "l4", aFrom: "l2", bFrom: "l3" }
+        { id: "l4", aSeed: 7, bSeed: 8 },
+        { id: "l5", aSeed: 9, bSeed: 10 }
       ],
       final: [
-        { id: "l5", aFrom: "l1", bFrom: "l4" }
+        { id: "l6", aSeed: 11, bSeed: 12 }
       ]
     },
 
     // ===== グランドファイナル =====
     grandFinal: [
-      { id: "gf", aFrom: "m8", bFrom: "l5" }
+      { id: "gf", aFrom: "m8", bFrom: "l6" }
     ]
   };
 }
 
 function teamAtSeed(seed, slots) {
-  return slots[seed - 1];
+  return slots[seed - 1] || null;
 }
 
-//
-// =========================
-// 🧠 ブラケット計算
-// =========================
-//
 function buildBracket(section, slots, results) {
   const all = [];
 
@@ -106,8 +120,8 @@ function buildBracket(section, slots, results) {
     const m = all.find(x => x.id === id);
     if (!m) return null;
 
-    let a = m.aSeed ? teamAtSeed(m.aSeed, slots) : winnerOf(m.aFrom);
-    let b = m.bSeed ? teamAtSeed(m.bSeed, slots) : winnerOf(m.bFrom);
+    const a = m.aSeed ? teamAtSeed(m.aSeed, slots) : winnerOf(m.aFrom);
+    const b = m.bSeed ? teamAtSeed(m.bSeed, slots) : winnerOf(m.bFrom);
 
     const r = results[id];
     const pick = typeof r === "string" ? r : r?.winner;
@@ -126,6 +140,10 @@ function buildBracket(section, slots, results) {
 
     return {
       id: m.id,
+      aSeed: m.aSeed || null,
+      bSeed: m.bSeed || null,
+      aFrom: m.aFrom || null,
+      bFrom: m.bFrom || null,
       aName: aName || null,
       bName: bName || null,
       winner
@@ -136,24 +154,23 @@ function buildBracket(section, slots, results) {
 }
 
 function computeBracket(state) {
-  const { slots, results } = state;
+  const { upperSlots, lowerSlots, results } = state;
   const map = matchMap();
 
-  const upper = buildBracket(map.upper, slots, results);
-  const lower = buildBracket(map.lower, slots, results);
+  const upper = buildBracket(map.upper, upperSlots, results);
+  const lower = buildBracket(map.lower, lowerSlots, results);
 
-  // 👑 グランドファイナル
   const grandFinal = map.grandFinal.map(m => {
     const aName = upper.winnerOf("m8");
-    const bName = lower.winnerOf("l5");
+    const bName = lower.winnerOf("l6");
 
     const r = results[m.id];
     const winner = typeof r === "string" ? r : r?.winner || null;
 
     return {
       id: m.id,
-      aName,
-      bName,
+      aName: aName || null,
+      bName: bName || null,
       winner
     };
   });
@@ -161,14 +178,10 @@ function computeBracket(state) {
   return { upper, lower, grandFinal };
 }
 
-//
-// =========================
-// 🧠 API
-// =========================
-//
 function syncTeamsFromSlots(data) {
   const set = new Set();
-  for (const t of data.slots) if (t) set.add(t);
+  for (const t of data.upperSlots || []) if (t) set.add(t);
+  for (const t of data.lowerSlots || []) if (t) set.add(t);
   data.teams = Array.from(set);
 }
 
@@ -178,61 +191,85 @@ app.get("/api/state", async (req, res) => {
 
   res.json({
     teams: db.data.teams,
-    slots: db.data.slots,
+    upperSlots: db.data.upperSlots,
+    lowerSlots: db.data.lowerSlots,
     results: db.data.results,
     bracket
   });
 });
 
 app.post("/api/seed/set-name", auth, async (req, res) => {
-  const { seed, name } = req.body;
+  const { seed, name, bracket } = req.body;
 
-  if (!seed || seed < 1 || seed > 32)
+  if (!seed || seed < 1 || seed > 32) {
     return res.status(400).json({ error: "Invalid seed" });
+  }
 
-  if (!name || !name.trim())
+  if (!name || !name.trim()) {
     return res.status(400).json({ error: "Invalid name" });
+  }
+
+  if (bracket !== "upper" && bracket !== "lower") {
+    return res.status(400).json({ error: "Invalid bracket" });
+  }
 
   await db.read();
 
+  const key = bracket === "upper" ? "upperSlots" : "lowerSlots";
   const n = name.trim();
 
-  db.data.slots = db.data.slots.map((t, idx) =>
+  db.data[key] = db.data[key].map((t, idx) =>
     idx === seed - 1 ? t : (t === n ? null : t)
   );
 
-  db.data.slots[seed - 1] = n;
+  db.data[key][seed - 1] = n;
 
   syncTeamsFromSlots(db.data);
-
   await db.write();
 
-  res.json({ ok: true });
+  res.json({
+    ok: true,
+    upperSlots: db.data.upperSlots,
+    lowerSlots: db.data.lowerSlots
+  });
 });
 
 app.post("/api/seed/clear", auth, async (req, res) => {
   await db.read();
-  db.data.slots = Array(32).fill(null);
+  db.data.upperSlots = Array(32).fill(null);
+  db.data.lowerSlots = Array(32).fill(null);
   db.data.results = {};
   syncTeamsFromSlots(db.data);
   await db.write();
-  res.json({ ok: true });
+
+  res.json({
+    ok: true,
+    upperSlots: db.data.upperSlots,
+    lowerSlots: db.data.lowerSlots,
+    results: db.data.results
+  });
 });
+
+function isValidMatchId(matchId) {
+  return /^(m\d+|l\d+|gf)$/.test(matchId);
+}
 
 app.post("/api/results/set", auth, async (req, res) => {
   const { matchId, winner } = req.body;
 
-  if (!/^[mlg]f?\d+$/.test(matchId))
+  if (!isValidMatchId(matchId)) {
     return res.status(400).json({ error: "Bad matchId" });
+  }
 
-  if (!(winner === "A" || winner === "B"))
+  if (!(winner === "A" || winner === "B")) {
     return res.status(400).json({ error: "Winner must be 'A' or 'B'" });
+  }
 
   await db.read();
   db.data.results[matchId] = winner;
   await db.write();
 
-  res.json({ ok: true });
+  res.json({ ok: true, results: db.data.results });
 });
 
 app.post("/api/results/reset", auth, async (req, res) => {
@@ -242,22 +279,20 @@ app.post("/api/results/reset", auth, async (req, res) => {
   res.json({ ok: true });
 });
 
-//
-// =========================
-// 🧠 BO3対応
-// =========================
-//
 app.post("/api/results/set-bo3", auth, async (req, res) => {
   const { matchId, games, winner } = req.body;
 
-  if (!/^[mlg]f?\d+$/.test(matchId))
+  if (!isValidMatchId(matchId)) {
     return res.status(400).json({ error: "Bad matchId" });
+  }
 
-  if (!Array.isArray(games) || games.length === 0)
+  if (!Array.isArray(games) || games.length === 0) {
     return res.status(400).json({ error: "Games required" });
+  }
 
-  if (!(winner === "A" || winner === "B"))
+  if (!(winner === "A" || winner === "B")) {
     return res.status(400).json({ error: "Winner must be A or B" });
+  }
 
   await db.read();
 
@@ -267,15 +302,9 @@ app.post("/api/results/set-bo3", auth, async (req, res) => {
   };
 
   await db.write();
-
-  res.json({ ok: true });
+  res.json({ ok: true, results: db.data.results });
 });
 
-//
-// =========================
-// 静的
-// =========================
-//
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("*", (req, res) => {
