@@ -91,10 +91,15 @@ function render(data) {
   const r3 = upper(data.bracket.map.semis);
   const r4 = upper(data.bracket.map.final);
 
-  renderRound(mk("1回戦"), r1, true);
-  renderRound(mk("2回戦"), r2, false);
-  renderRound(mk("準決勝"), r3, false);
-  renderRound(mk("決勝"), r4, false);
+  const col2 = mk("2回戦");
+  const col1 = mk("1回戦"); // ← 後に作るから下にくる
+  const col3 = mk("準決勝");
+  const col4 = mk("決勝");
+
+  renderRound(col2, r2, false);
+  renderRound(col1, r1, true); // ← ここ重要
+  renderRound(col3, r3, false);
+  renderRound(col4, r4, false);
 }
 
 function renderRound(col, matches, firstRound) {
