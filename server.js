@@ -38,7 +38,9 @@ function matchMap() {
       { id: "m2", aSeed: 3, bSeed: 4 },
       { id: "m3", aSeed: 5, bSeed: 6 },
       { id: "m4", aSeed: 7, bSeed: 8 },
-      { id: "m5", aSeed: 9, bSeed: 10 }
+
+      // 👇 ここがポイント
+      { id: "m5", aFrom: "m1", bSeed: 9 }
     ],
 
     // 🔥 準決勝（自動）
