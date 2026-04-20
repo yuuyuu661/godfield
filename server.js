@@ -14,9 +14,9 @@ app.use(express.json());
 
 const dbFile = path.join(__dirname, "db.json");
 const adapter = new JSONFile(dbFile);
-const db = new Low(adapter, { teams: [], slots: Array(32).fill(null), results: {} });
+const db = new Low(adapter, { teams: [], slots: Array(9).fill(null), results: {} });
 await db.read();
-if (!db.data) db.data = { teams: [], slots: Array(32).fill(null), results: {} };
+if (!db.data) db.data = { teams: [], slots: Array(9).fill(null), results: {} };
 await db.write();
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "change-me";
@@ -27,12 +27,31 @@ const auth = (req, res, next) => {
 };
 
 function matchMap() {
-  const round1 = Array.from({ length: 16 }, (_, i) => ({ id: `m${i + 1}`, aSeed: i * 2 + 1, bSeed: i * 2 + 2 }));
-  const round2 = Array.from({ length: 8 }, (_, i) => ({ id: `m${17 + i}`, aFrom: `m${i * 2 + 1}`, bFrom: `m${i * 2 + 2}` }));
-  const quarters = Array.from({ length: 4 }, (_, i) => ({ id: `m${25 + i}`, aFrom: `m${17 + i * 2}`, bFrom: `m${18 + i * 2}` }));
-  const semis = [ { id: "m29", aFrom: "m25", bFrom: "m26" }, { id: "m30", aFrom: "m27", bFrom: "m28" } ];
-  const final = [ { id: "m31", aFrom: "m29", bFrom: "m30" } ];
-  return { round1, round2, quarters, semis, final };
+  return {
+    // 🥊 1回戦（1試合だけ）
+    round1: [
+      { id: "m1", aSeed: 1, bSeed: 2 }
+    ],
+
+    // 🏆 2回戦（実質ここから本戦）
+    round2: [
+      { id: "m2", aFrom: "m1", bSeed: 3 },
+      { id: "m3", aSeed: 4, bSeed: 5 },
+      { id: "m4", aSeed: 6, bSeed: 7 },
+      { id: "m5", aSeed: 8, bSeed: 9 }
+    ],
+
+    // 🔥 準決勝
+    semis: [
+      { id: "m6", aFrom: "m2", bFrom: "m3" },
+      { id: "m7", aFrom: "m4", bFrom: "m5" }
+    ],
+
+    // 👑 決勝
+    final: [
+      { id: "m8", aFrom: "m6", bFrom: "m7" }
+    ]
+  };
 }
 
 function teamAtSeed(seed, slots) { return slots[seed - 1]; }
@@ -43,7 +62,6 @@ function computeBracket(state) {
   const all = [];
   map.round1.forEach(m => all.push({ ...m }));
   map.round2.forEach(m => all.push({ ...m }));
-  map.quarters.forEach(m => all.push({ ...m }));
   map.semis.forEach(m => all.push({ ...m }));
   map.final.forEach(m => all.push({ ...m }));
 
