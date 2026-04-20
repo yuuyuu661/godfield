@@ -19,7 +19,7 @@ await db.read();
 if (!db.data) db.data = { teams: [], slots: Array(9).fill(null), results: {} };
 await db.write();
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "change-me";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "yamada";
 const auth = (req, res, next) => {
   const pass = (req.headers["x-admin-pass"] || req.body.password || "").toString();
   if (pass !== ADMIN_PASSWORD) return res.status(401).json({ error: "Unauthorized" });
