@@ -92,12 +92,12 @@ function render(data) {
   const r4 = upper(data.bracket.map.final);
 
   const col2 = mk("2回戦");
-  const col1 = mk("1回戦"); // ← 後に作るから下にくる
+  const col1 = mk("1回戦");
   const col3 = mk("準決勝");
   const col4 = mk("決勝");
 
   renderRound(col2, r2, false);
-  renderRound(col1, r1, true); // ← ここ重要
+  renderRound(col1, r1, true);
   renderRound(col3, r3, false);
   renderRound(col4, r4, false);
 }
@@ -253,18 +253,49 @@ function drawWires() {
   function midLeft(el)  { const r = el.getBoundingClientRect(); return [r.left - pad.left,  r.top + r.height/2 - pad.top]; }
 
   function connectRound(fromCol, toCol) {
-    const a = $$(".match", fromCol);
-    const b = $$(".match", toCol);
-    for (let i = 0; i < b.length; i++) {
-      const src1 = a[i*2];
-      const src2 = a[i*2+1];
+    const fromMatches = $$(".match", fromCol);
+    const toMatches = $$(".match", toCol);
+
+    // =========================
+    // 🔥 特殊：1回戦 → 2回戦（下に合流）
+    // =========================
+    if (fromMatches.length === 1 && toMatches.length > 1) {
+      const src = fromMatches[0];
+      const dst = toMatches[toMatches.length - 1]; // ← 一番下
+
+      const [x1, y1] = midRight(src);
+      const [dx, dy] = midLeft(dst);
+
+      const midX = (x1 + dx) / 2;
+
+      const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      const d = `M ${x1} ${y1} 
+                 C ${midX} ${y1}, 
+                   ${midX} ${dy}, 
+                   ${dx} ${dy}`;
+      p.setAttribute("d", d);
+      svg.appendChild(p);
+
+      return;
+    }
+
+    // =========================
+    // 通常トーナメント接続
+    // =========================
+    for (let i = 0; i < toMatches.length; i++) {
+      const src1 = fromMatches[i*2];
+      const src2 = fromMatches[i*2+1];
       if (!src1 || !src2) continue;
-      const dst = b[i];
+
+      const dst = toMatches[i];
+
       const [x1,y1] = midRight(src1);
       const [x2,y2] = midRight(src2);
       const [dx,dy] = midLeft(dst);
+
       const mx1 = (x1 + dx) / 2;
       const mx2 = (x2 + dx) / 2;
+
       addPath(x1,y1, dx, dy - 10, mx1);
       addPath(x2,y2, dx, dy + 10, mx2);
     }
