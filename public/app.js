@@ -117,7 +117,7 @@ function render(data) {
         ? (slots[m.aSeed - 1] || "--")
         : (() => {
             const A = lowerResolved[m.aFrom];
-            return (A && A.winner)
+            return A
               ? (A.winner === "A" ? A.aName : A.bName)
               : "--";
           })();
@@ -126,7 +126,7 @@ function render(data) {
         ? (slots[m.bSeed - 1] || "--")
         : (() => {
             const B = lowerResolved[m.bFrom];
-            return (B && B.winner)
+            return B
               ? (B.winner === "A" ? B.aName : B.bName)
               : "--";
           })();
