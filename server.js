@@ -14,9 +14,9 @@ app.use(express.json());
 
 const dbFile = path.join(__dirname, "db.json");
 const adapter = new JSONFile(dbFile);
-const db = new Low(adapter, { teams: [], slots: Array(9).fill(null), results: {} });
+const db = new Low(adapter, { teams: [], slots: Array(10).fill(null), results: {} });
 await db.read();
-if (!db.data) db.data = { teams: [], slots: Array(9).fill(null), results: {} };
+if (!db.data) db.data = { teams: [], slots: Array(10).fill(null), results: {} };
 await db.write();
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "yamada";
