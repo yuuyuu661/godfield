@@ -53,37 +53,40 @@ function render(data) {
     return col;
   };
 
-  const r1 = data.bracket.map.round1.map(m => {
-    const r = data.results[m.id];
-    return {
-      id: m.id,
-      aSeed: m.aSeed,
-      bSeed: m.bSeed,
-      aName: slots[m.aSeed - 1] || "--",
-      bName: slots[m.bSeed - 1] || "--",
-      winner: typeof r === "string" ? r : r?.winner || null
-    };
-  });
+  // =========================
+  // 🧠 新構造
+  // =========================
+  const upper = data.bracket.upper;
+  const lower = data.bracket.lower;
+  const gf = data.bracket.grandFinal;
 
-  const resolved = Object.fromEntries(data.bracket.resolved.map(m => [m.id, m]));
+  const upperResolved = Object.fromEntries(
+    upper.resolved.map(m => [m.id, m])
+  );
 
-  function upper(list) {
+  const lowerResolved = Object.fromEntries(
+    lower.resolved.map(m => [m.id, m])
+  );
+
+  // =========================
+  // 勝者側
+  // =========================
+  function upperBuild(list) {
     return list.map(m => {
 
-      // 👇 seedがある場合は直接参照
       const aN = m.aSeed
-        ? (state.data.slots[m.aSeed - 1] || "--")
+        ? (slots[m.aSeed - 1] || "--")
         : (() => {
-            const A = resolved[m.aFrom];
+            const A = upperResolved[m.aFrom];
             return (A && A.winner)
               ? (A.winner === "A" ? A.aName : A.bName)
               : "--";
           })();
 
       const bN = m.bSeed
-        ? (state.data.slots[m.bSeed - 1] || "--")
+        ? (slots[m.bSeed - 1] || "--")
         : (() => {
-            const B = resolved[m.bFrom];
+            const B = upperResolved[m.bFrom];
             return (B && B.winner)
               ? (B.winner === "A" ? B.aName : B.bName)
               : "--";
@@ -96,25 +99,87 @@ function render(data) {
         aName: aN,
         bName: bN,
         winner: typeof r === "string" ? r : r?.winner || null,
-
-        // 👇 これ重要
         aSeed: m.aSeed || null,
         bSeed: m.bSeed || null,
-
         aFrom: m.aFrom,
         bFrom: m.bFrom
       };
     });
   }
 
-  const r2 = upper(data.bracket.map.round2);
-  const r3 = upper(data.bracket.map.semis);
-  const r4 = upper(data.bracket.map.final);
+  // =========================
+  // 敗者側
+  // =========================
+  function lowerBuild(list) {
+    return list.map(m => {
 
-  renderRound(mk("1回戦"), r1, true);
-  renderRound(mk("2回戦"), r2, false);
-  renderRound(mk("準決勝"), r3, false);
-  renderRound(mk("決勝"), r4, false);
+      const aN = m.aSeed
+        ? (slots[m.aSeed - 1] || "--")
+        : (() => {
+            const A = lowerResolved[m.aFrom];
+            return (A && A.winner)
+              ? (A.winner === "A" ? A.aName : A.bName)
+              : "--";
+          })();
+
+      const bN = m.bSeed
+        ? (slots[m.bSeed - 1] || "--")
+        : (() => {
+            const B = lowerResolved[m.bFrom];
+            return (B && B.winner)
+              ? (B.winner === "A" ? B.aName : B.bName)
+              : "--";
+          })();
+
+      const r = state.data.results[m.id];
+
+      return {
+        id: m.id,
+        aName: aN,
+        bName: bN,
+        winner: typeof r === "string" ? r : r?.winner || null,
+        aSeed: m.aSeed || null,
+        bSeed: m.bSeed || null,
+        aFrom: m.aFrom,
+        bFrom: m.bFrom
+      };
+    });
+  }
+
+  // =========================
+  // GF
+  // =========================
+  function gfBuild(list) {
+    return list.map(m => {
+      const r = state.data.results[m.id];
+
+      return {
+        id: m.id,
+        aName: m.aName || "--",
+        bName: m.bName || "--",
+        winner: typeof r === "string" ? r : r?.winner || null
+      };
+    });
+  }
+
+  // =========================
+  // 描画
+  // =========================
+
+  // 上
+  renderRound(mk("勝者 1回戦"), upperBuild(upper.map.round1), true);
+  renderRound(mk("勝者 2回戦"), upperBuild(upper.map.round2), false);
+  renderRound(mk("勝者 準決勝"), upperBuild(upper.map.semis), false);
+  renderRound(mk("勝者 決勝"), upperBuild(upper.map.final), false);
+
+  // 下
+  renderRound(mk("敗者 1回戦"), lowerBuild(lower.map.round1), true);
+  renderRound(mk("敗者 2回戦"), lowerBuild(lower.map.round2), false);
+  renderRound(mk("敗者 準決勝"), lowerBuild(lower.map.semis), false);
+  renderRound(mk("敗者 決勝"), lowerBuild(lower.map.final), false);
+
+  // GF
+  renderRound(mk("グランドファイナル"), gfBuild(gf), false);
 }
 
 function renderRound(col, matches, firstRound) {
