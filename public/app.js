@@ -75,8 +75,8 @@ function render(data) {
   function upperBuild(list) {
     return list.map(m => {
 
-      const bN = m.bSeed
-        ? (upperSlots[m.bSeed - 1] || "--")
+      const aN = m.aSeed
+        ? (upperSlots[m.aSeed - 1] || "--")
         : (() => {
             const A = upperResolved[m.aFrom];
             return (A && A.winner)
@@ -85,7 +85,7 @@ function render(data) {
           })();
 
       const bN = m.bSeed
-        ? (slots[m.bSeed - 1] || "--")
+        ? (upperSlots[m.bSeed - 1] || "--")
         : (() => {
             const B = upperResolved[m.bFrom];
             return (B && B.winner)
@@ -115,8 +115,8 @@ function render(data) {
   function lowerBuild(list) {
     return list.map(m => {
 
-      const bN = m.bSeed
-        ? (lowerSlots[m.bSeed - 1] || "--")
+      const aN = m.aSeed
+        ? (lowerSlots[m.aSeed - 1] || "--")
         : (() => {
             const A = lowerResolved[m.aFrom];
             return A
@@ -125,7 +125,7 @@ function render(data) {
           })();
 
       const bN = m.bSeed
-        ? (slots[m.bSeed - 1] || "--")
+        ? (lowerSlots[m.bSeed - 1] || "--")
         : (() => {
             const B = lowerResolved[m.bFrom];
             return B
