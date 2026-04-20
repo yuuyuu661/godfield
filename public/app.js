@@ -158,17 +158,19 @@ function renderRound(col, matches, firstRound) {
     if (m.aSeed) {
       a.addEventListener("contextmenu", (ev) => {
         ev.preventDefault();
-        seedContext(ev, m.aSeed);
+        ev.stopPropagation();   // ← これ追加
+        ev.stopImmediatePropagation(); // ← これも追加
+        seedPrompt(m.aSeed);
       });
-      longPress(a, () => seedPrompt(m.aSeed));
     }
 
     if (m.bSeed) {
       b.addEventListener("contextmenu", (ev) => {
         ev.preventDefault();
-        seedContext(ev, m.bSeed);
+        ev.stopPropagation();
+        ev.stopImmediatePropagation();
+        seedPrompt(m.bSeed);
       });
-      longPress(b, () => seedPrompt(m.bSeed));
     }
 
     if (m.winner === "A") { a.classList.add("won"); b.classList.add("lost"); box.classList.add("decided"); }
