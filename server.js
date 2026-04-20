@@ -35,7 +35,7 @@ function matchMap() {
 
     // 🏆 2回戦（実質ここから本戦）
     round2: [
-      { id: "m2", aFrom: "m1", bSeed: 3 },
+      { id: "m2", aSeed: 2, bSeed: 3 },
       { id: "m3", aSeed: 4, bSeed: 5 },
       { id: "m4", aSeed: 6, bSeed: 7 },
       { id: "m5", aSeed: 8, bSeed: 9 }
