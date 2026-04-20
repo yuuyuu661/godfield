@@ -156,12 +156,18 @@ function renderRound(col, matches, firstRound) {
     });
 
     if (m.aSeed) {
-      a.addEventListener("contextmenu", (ev) => seedContext(ev, m.aSeed));
+      a.addEventListener("contextmenu", (ev) => {
+        ev.preventDefault();
+        seedContext(ev, m.aSeed);
+      });
       longPress(a, () => seedPrompt(m.aSeed));
     }
 
     if (m.bSeed) {
-      b.addEventListener("contextmenu", (ev) => seedContext(ev, m.bSeed));
+      b.addEventListener("contextmenu", (ev) => {
+        ev.preventDefault();
+        seedContext(ev, m.bSeed);
+      });
       longPress(b, () => seedPrompt(m.bSeed));
     }
 
