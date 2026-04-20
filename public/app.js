@@ -39,7 +39,8 @@ async function load() {
 
 // ---------- Bracket (same behavior) ----------
 function render(data) {
-  const slots = data.slots || [];
+  const upperSlots = data.upperSlots || [];
+  const lowerSlots = data.lowerSlots || [];
   const cols = $("#cols");
   cols.innerHTML = "";
 
@@ -74,8 +75,8 @@ function render(data) {
   function upperBuild(list) {
     return list.map(m => {
 
-      const aN = m.aSeed
-        ? (slots[m.aSeed - 1] || "--")
+      const bN = m.bSeed
+        ? (upperSlots[m.bSeed - 1] || "--")
         : (() => {
             const A = upperResolved[m.aFrom];
             return (A && A.winner)
@@ -102,7 +103,8 @@ function render(data) {
         aSeed: m.aSeed || null,
         bSeed: m.bSeed || null,
         aFrom: m.aFrom,
-        bFrom: m.bFrom
+        bFrom: m.bFrom,
+        bracket: "upper"
       };
     });
   }
@@ -113,8 +115,8 @@ function render(data) {
   function lowerBuild(list) {
     return list.map(m => {
 
-      const aN = m.aSeed
-        ? (slots[m.aSeed - 1] || "--")
+      const bN = m.bSeed
+        ? (lowerSlots[m.bSeed - 1] || "--")
         : (() => {
             const A = lowerResolved[m.aFrom];
             return A
@@ -141,7 +143,8 @@ function render(data) {
         aSeed: m.aSeed || null,
         bSeed: m.bSeed || null,
         aFrom: m.aFrom,
-        bFrom: m.bFrom
+        bFrom: m.bFrom,
+        bracket: "lower"
       };
     });
   }
@@ -277,14 +280,28 @@ function longPress(el, cb, ms = 600) {
 }
 
 function seedContext(ev, seed) { ev.preventDefault(); seedPrompt(seed); }
-function seedPrompt(seed) {
-  if (!state.pass) { alert("管理パスワードが必要です"); return; }
-  const current = prompt(`Seed ${seed} のチーム名を入力`, "");
+function seedPrompt(seed, bracket = "upper") {
+  if (!state.pass) {
+    alert("管理パスワードが必要です");
+    return;
+  }
+
+  const current = prompt(
+    `${bracket === "upper" ? "勝者側" : "敗者側"} Seed ${seed} のチーム名を入力`,
+    ""
+  );
+
   if (current === null) return;
+
   const name = current.trim();
   if (!name) return;
-  api("/api/seed/set-name", { method: "POST", body: JSON.stringify({ seed, name }) })
-    .then(load).catch(e => alert(e.message));
+
+  api("/api/seed/set-name", {
+    method: "POST",
+    body: JSON.stringify({ seed, name, bracket })
+  })
+    .then(load)
+    .catch(e => alert(e.message));
 }
 
 async function setResult(matchId, winner) {
