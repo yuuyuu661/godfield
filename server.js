@@ -28,26 +28,26 @@ const auth = (req, res, next) => {
 
 function matchMap() {
   return {
-    // 🥊 1回戦（1試合だけ）
+    // 🥊 1回戦（予選）
     round1: [
       { id: "m1", aSeed: 1, bSeed: 2 }
     ],
 
-    // 🏆 2回戦（実質ここから本戦）
+    // 🏆 2回戦（手動入力ゾーン）
     round2: [
-      { id: "m2", aSeed: 2, bSeed: 3 },
-      { id: "m3", aSeed: 4, bSeed: 5 },
-      { id: "m4", aSeed: 6, bSeed: 7 },
-      { id: "m5", aSeed: 8, bSeed: 9 }
+      { id: "m2", aSeed: 3, bSeed: 4 },
+      { id: "m3", aSeed: 5, bSeed: 6 },
+      { id: "m4", aSeed: 7, bSeed: 8 },
+      { id: "m5", aSeed: 9, bSeed: 10 }
     ],
 
-    // 🔥 準決勝
+    // 🔥 準決勝（自動）
     semis: [
       { id: "m6", aFrom: "m2", bFrom: "m3" },
       { id: "m7", aFrom: "m4", bFrom: "m5" }
     ],
 
-    // 👑 決勝
+    // 👑 決勝（自動）
     final: [
       { id: "m8", aFrom: "m6", bFrom: "m7" }
     ]
