@@ -88,15 +88,13 @@ function render(data) {
   }
 
   const r2 = upper(data.bracket.map.round2);
-  const r3 = upper(data.bracket.map.quarters);
-  const r4 = upper(data.bracket.map.semis);
-  const r5 = upper(data.bracket.map.final);
+  const r3 = upper(data.bracket.map.semis);
+  const r4 = upper(data.bracket.map.final);
 
   renderRound(mk("1回戦"), r1, true);
   renderRound(mk("2回戦"), r2, false);
-  renderRound(mk("準々決勝"), r3, false);
-  renderRound(mk("準決勝"), r4, false);
-  renderRound(mk("決勝"), r5, false);
+  renderRound(mk("準決勝"), r3, false);
+  renderRound(mk("決勝"), r4, false);
 }
 
 function renderRound(col, matches, firstRound) {
