@@ -242,21 +242,23 @@ function renderRound(col, matches, firstRound) {
         openBo3Modal(m.id, m.aName, m.bName);
       });
     });
+    
 
     if (m.aSeed) {
       a.addEventListener("contextmenu", (ev) => {
         ev.preventDefault();
-        seedPrompt(m.aSeed);
+        seedPrompt(m.aSeed, m.bracket);
       });
     }
 
     if (m.bSeed) {
       b.addEventListener("contextmenu", (ev) => {
         ev.preventDefault();
-        seedPrompt(m.bSeed);
+        seedPrompt(m.bSeed, m.bracket);
       });
     }
 
+    
     if (m.winner === "A") { a.classList.add("won"); b.classList.add("lost"); box.classList.add("decided"); }
     if (m.winner === "B") { b.classList.add("won"); a.classList.add("lost"); box.classList.add("decided"); }
 
