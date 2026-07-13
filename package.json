@@ -1,15 +1,13 @@
 {
-  "name": "tournament32",
-  "version": "1.5.0",
+  "name": "variable-tournament",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "lowdb": "^7.0.1",
-    "nanoid": "^5.0.7"
+    "express": "^4.21.2"
   }
 }
+

@@ -1,109 +1,71 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>32チーム・トーナメント</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>トーナメントメーカー</title>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <header>
-    <h1>32チーム・シングルエリミネーション</h1>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">TOURNAMENT CONTROL</p>
+      <h1>トーナメントメーカー</h1>
+    </div>
+    <button id="resetButton" class="reset-button">トーナメント表リセット</button>
   </header>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="bracket">トーナメント</button>
-    <button class="tab" data-tab="roulette">ルーレット</button>
-  </nav>
-
-  <section id="admin" data-tab-panel="bracket">
-    <details open>
-      <summary>管理パネル</summary>
-      <div class="admin-grid">
-        <label>管理パスワード <input id="pass" type="password" placeholder="••••" /></label>
-        <div class="seed-actions">
-          <button id="clearSeeds" class="danger">配置クリア</button>
-          <button id="resetResults" class="danger">勝敗リセット</button>
-        </div>
-        <div><small>1回戦：<b>左クリック＝勝者</b>／<b>右クリック or 長押し＝チーム名登録/編集</b></small></div>
+  <main>
+    <section class="setup card">
+      <div>
+        <span class="step">01</span>
+        <h2>参加人数から表を作る</h2>
+        <p>12〜32人を入力すると、シードとBYEを含む表を自動生成します。</p>
       </div>
-    </details>
-  </section>
+      <form id="setupForm">
+        <label for="participantCount">参加人数</label>
+        <input id="participantCount" type="number" min="12" max="32" value="16" required>
+        <button type="submit">トーナメント表を作成</button>
+      </form>
+    </section>
 
-  <main id="bracket" data-tab-panel="bracket">
-    <svg id="wires" aria-hidden="true"></svg>
-    <div id="cols" class="columns"></div>
+    <section id="rouletteCard" class="roulette card" hidden>
+      <div class="section-heading">
+        <div><span class="step">02</span><h2>ルーレットで枠を決める</h2></div>
+        <p id="allocationStatus"></p>
+      </div>
+      <div class="roulette-layout">
+        <div class="wheel-wrap">
+          <div class="pointer"></div>
+          <canvas id="wheel" width="520" height="520"></canvas>
+          <button id="spinButton" class="spin-button">回す</button>
+        </div>
+        <div class="roulette-controls">
+          <label for="names">プレイヤー名（「,」区切りで一斉登録）</label>
+          <textarea id="names" rows="6" placeholder="プレイヤーA, プレイヤーB, プレイヤーC"></textarea>
+          <div class="control-row">
+            <button id="loadNames" type="button">ルーレットに登録</button>
+            <label>登録先
+              <select id="targetSeed"></select>
+            </label>
+          </div>
+          <div id="rouletteResult" class="roulette-result">名前を登録してください</div>
+          <p class="hint">停止したプレイヤーは選択中の枠へ登録され、ルーレットから自動で削除されます。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="bracketSection" class="bracket-section" hidden>
+      <div class="section-heading">
+        <div><span class="step">03</span><h2>トーナメント表</h2></div>
+        <p>対戦カードのプレイヤー名を押すと勝者を登録できます。</p>
+      </div>
+      <div id="bracket" class="bracket"></div>
+    </section>
   </main>
 
-  <section id="roulette" data-tab-panel="roulette" hidden>
-    <div class="roulette-wrap">
-      <div class="wheel-area">
-        <canvas id="wheel" width="420" height="420"></canvas>
-        <div class="pointer">▼</div>
-        <audio id="sfxSpin" src="/sfx/spin.mp3" preload="auto"></audio>
-        <audio id="sfxStop" src="/sfx/stop.mp3" preload="auto"></audio>
-      </div>
-      <div class="controls">
-        <label>項目（カンマ区切り）</label>
-        <textarea id="items" rows="6"></textarea>
-        <div class="btns">
-          <button id="preset32">1〜32をセット</button>
-          <button id="spin">SPIN!</button>
-          <button id="spinRemove">SPIN!（出目を削除）</button>
-        </div>
-        <div id="result"></div>
-        <div id="pending" class="pending"></div>
-      </div>
-    </div>
-  </section>
-
-  <template id="matchTpl">
-    <div class="match" data-match>
-      <div class="row" data-side="A">
-        <span class="seed"></span>
-        <span class="name">--</span>
-      </div>
-      <div class="row" data-side="B">
-        <span class="seed"></span>
-        <span class="name">--</span>
-      </div>
-      <div class="bo3-scores"></div>
-    </div>
-  </template>
-
-  <template id="bo3Tpl">
-    <div class="bo3">
-      <h3>BO3 スコア入力</h3>
-
-      <div class="games">
-        <div class="game">
-          <span>Game 1</span>
-          <input type="number" min="0" data-side="A" />
-          -
-          <input type="number" min="0" data-side="B" />
-        </div>
-        <div class="game">
-          <span>Game 2</span>
-          <input type="number" min="0" data-side="A" />
-          -
-          <input type="number" min="0" data-side="B" />
-        </div>
-        <div class="game">
-          <span>Game 3</span>
-          <input type="number" min="0" data-side="A" />
-          -
-          <input type="number" min="0" data-side="B" />
-        </div>
-      </div>
-
-      <div class="actions">
-        <button data-action="save">保存</button>
-        <button data-action="cancel">キャンセル</button>
-      </div>
-    </div>
-  </template>
-
-
+  <div id="toast" class="toast" role="status"></div>
   <script src="/app.js"></script>
 </body>
 </html>
+

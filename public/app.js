@@ -1,592 +1,339 @@
-const $ = (sel, el = document) => el.querySelector(sel);
-const $$ = (sel, el = document) => Array.from(el.querySelectorAll(sel));
+const $ = selector => document.querySelector(selector);
 
-const state = { pass: "", data: null };
+let state = { participantCount: 0, bracketSize: 0, slots: [], results: {} };
+let rouletteItems = [];
+let rotation = 0;
+let spinning = false;
+let toastTimer;
 
-// Tabs
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest(".tab");
-  if (!btn) return;
-  $$(".tab").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  const tab = btn.dataset.tab;
-  $$('[data-tab-panel]').forEach(p => p.hidden = p.getAttribute('data-tab-panel') !== tab);
-  if (tab === "bracket") setTimeout(drawWires, 50);
-});
-
-async function api(path, opts = {}) {
-  const res = await fetch(path, {
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      ...(opts.headers || {}),
-      ...(state.pass ? { "x-admin-pass": state.pass } : {})
-    }
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) }
   });
-  if (!res.ok) {
-    try { const j = await res.json(); throw new Error(j.error || "API error"); }
-    catch { throw new Error("API error"); }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || "通信に失敗しました");
+  return body;
+}
+
+function notify(message) {
+  const toast = $("#toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
+}
+
+function seedOrder(size) {
+  let order = [1, 2];
+  while (order.length < size) {
+    const sum = order.length * 2 + 1;
+    order = order.flatMap(seed => [seed, sum - seed]);
   }
-  return res.json();
+  return order;
 }
 
-async function load() {
-  const data = await api("/api/state", { method: "GET" });
-  state.data = data;
-  render(data);
-  drawWires();
-}
-
-// ---------- Bracket (same behavior) ----------
-function render(data) {
-  const upperSlots = data.upperSlots || [];
-  const lowerSlots = data.lowerSlots || [];
-  const cols = $("#cols");
-  cols.innerHTML = "";
-
-  const mk = (title) => {
-    const col = document.createElement("div");
-    col.className = "col";
-    const h = document.createElement("h2");
-    h.textContent = title;
-    col.appendChild(h);
-    cols.appendChild(col);
-    return col;
-  };
-
-  // =========================
-  // 🧠 新構造
-  // =========================
-  const upper = data.bracket.upper;
-  const lower = data.bracket.lower;
-  const gf = data.bracket.grandFinal;
-
-  const upperResolved = Object.fromEntries(
-    upper.resolved.map(m => [m.id, m])
-  );
-
-  const lowerResolved = Object.fromEntries(
-    lower.resolved.map(m => [m.id, m])
-  );
-
-  // =========================
-  // 勝者側
-  // =========================
-  function upperBuild(list) {
-    return list.map(m => {
-
-      const aN = m.aSeed
-        ? (upperSlots[m.aSeed - 1] || "--")
-        : (() => {
-            const A = upperResolved[m.aFrom];
-            return (A && A.winner)
-              ? (A.winner === "A" ? A.aName : A.bName)
-              : "--";
-          })();
-
-      const bN = m.bSeed
-        ? (upperSlots[m.bSeed - 1] || "--")
-        : (() => {
-            const B = upperResolved[m.bFrom];
-            return (B && B.winner)
-              ? (B.winner === "A" ? B.aName : B.bName)
-              : "--";
-          })();
-
-      const r = state.data.results[m.id];
-
-      return {
-        id: m.id,
-        aName: aN,
-        bName: bN,
-        winner: typeof r === "string" ? r : r?.winner || null,
-        aSeed: m.aSeed || null,
-        bSeed: m.bSeed || null,
-        aFrom: m.aFrom,
-        bFrom: m.bFrom,
-        bracket: "upper"
-      };
-    });
-  }
-
-  // =========================
-  // 敗者側
-  // =========================
-  function lowerBuild(list) {
-    return list.map(m => {
-
-      const aN = m.aSeed
-        ? (lowerSlots[m.aSeed - 1] || "--")
-        : (() => {
-            const A = lowerResolved[m.aFrom];
-            return A
-              ? (A.winner === "A" ? A.aName : A.bName)
-              : "--";
-          })();
-
-      const bN = m.bSeed
-        ? (lowerSlots[m.bSeed - 1] || "--")
-        : (() => {
-            const B = lowerResolved[m.bFrom];
-            return B
-              ? (B.winner === "A" ? B.aName : B.bName)
-              : "--";
-          })();
-
-      const r = state.data.results[m.id];
-
-      return {
-        id: m.id,
-        aName: aN,
-        bName: bN,
-        winner: typeof r === "string" ? r : r?.winner || null,
-        aSeed: m.aSeed || null,
-        bSeed: m.bSeed || null,
-        aFrom: m.aFrom,
-        bFrom: m.bFrom,
-        bracket: "lower"
-      };
-    });
-  }
-
-  // =========================
-  // GF
-  // =========================
-  function gfBuild(list) {
-    return list.map(m => {
-      const r = state.data.results[m.id];
-
-      return {
-        id: m.id,
-        aName: m.aName || "--",
-        bName: m.bName || "--",
-        winner: typeof r === "string" ? r : r?.winner || null
-      };
-    });
-  }
-
-  // =========================
-  // 描画
-  // =========================
-
-  // 上
-  renderRound(mk("勝者 1回戦"), upperBuild(upper.map.round1), true);
-  renderRound(mk("勝者 2回戦"), upperBuild(upper.map.round2), false);
-  renderRound(mk("勝者 準決勝"), upperBuild(upper.map.semis), false);
-  renderRound(mk("勝者 決勝"), upperBuild(upper.map.final), false);
-
-  // 下
-  renderRound(mk("敗者 1回戦"), lowerBuild(lower.map.round1), true);
-  renderRound(mk("敗者 2回戦"), lowerBuild(lower.map.round2), false);
-  renderRound(mk("敗者 準決勝"), lowerBuild(lower.map.semis), false);
-  renderRound(mk("敗者 決勝"), lowerBuild(lower.map.final), false);
-
-  // GF
-  renderRound(mk("グランドファイナル"), gfBuild(gf), false);
-}
-
-function renderRound(col, matches, firstRound) {
-  matches.forEach((m) => {
-    const tpl = document.importNode($("#matchTpl").content, true);
-    const box = tpl.querySelector(".match");
-    box.dataset.matchId = m.id;
-    const a = tpl.querySelector('[data-side="A"]');
-    const b = tpl.querySelector('[data-side="B"]');
-    a.querySelector(".name").textContent = m.aName || "--";
-    b.querySelector(".name").textContent = m.bName || "--";
-    a.querySelector(".seed").textContent = firstRound ? String(m.aSeed) : "";
-    b.querySelector(".seed").textContent = firstRound ? String(m.bSeed) : "";
-
-    const scoresEl = tpl.querySelector(".bo3-scores");
-        if (scoresEl) {
-          scoresEl.innerHTML = "";
-
-          const r = state.data.results[m.id];
-          const games = r?.games || [];
-
-          // 最大3試合分表示（なければ 0-0）
-          for (let i = 0; i < 3; i++) {
-            const g = games[i] || { a: 0, b: 0 };
-            scoresEl.insertAdjacentHTML(
-              "beforeend",
-              `<div class="game">
-                 <span>${g.a}</span>
-                 <span>${g.b}</span>
-               </div>`
-            );
-          }
-
-          // セットカウント（2-0 など）
-          let winA = 0, winB = 0;
-          games.forEach(g => {
-            if (g.a > g.b) winA++;
-            if (g.b > g.a) winB++;
-          });
-
-          scoresEl.insertAdjacentHTML(
-            "beforeend",
-            `<div class="summary">
-               <span>${winA}</span>
-               <span>${winB}</span>
-             </div>`
-          );
-        }
-
-    [a, b].forEach((row) => {
-      row.addEventListener("click", (ev) => {
-        ev.preventDefault();
-        if (!state.pass) return alert("管理パスワードが必要です");
-        const side = row.dataset.side;
-        const name = row.querySelector(".name").textContent;
-        if (!name || name === "--") return;
-        openBo3Modal(m.id, m.aName, m.bName);
-      });
-    });
-    
-
-    if (m.aSeed) {
-      a.addEventListener("contextmenu", (ev) => {
-        ev.preventDefault();
-        seedPrompt(m.aSeed, m.bracket);
-      });
-    }
-
-    if (m.bSeed) {
-      b.addEventListener("contextmenu", (ev) => {
-        ev.preventDefault();
-        seedPrompt(m.bSeed, m.bracket);
-      });
-    }
-
-    
-    if (m.winner === "A") { a.classList.add("won"); b.classList.add("lost"); box.classList.add("decided"); }
-    if (m.winner === "B") { b.classList.add("won"); a.classList.add("lost"); box.classList.add("decided"); }
-
-    col.appendChild(tpl);
-  });
-}
-
-function longPress(el, cb, ms = 600) {
-  let timer = null;
-  const start = (e) => {
-    if (e.type === "mousedown" && e.button !== 0) return;
-    timer = setTimeout(() => cb(), ms);
-  };
-  const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
-  el.addEventListener("touchstart", start);
-  el.addEventListener("touchend", clear);
-  el.addEventListener("touchmove", clear);
-  el.addEventListener("mousedown", start);
-  el.addEventListener("mouseup", clear);
-  el.addEventListener("mouseleave", clear);
-}
-
-function seedContext(ev, seed) { ev.preventDefault(); seedPrompt(seed); }
-function seedPrompt(seed, bracket = "upper") {
-  if (!state.pass) {
-    alert("管理パスワードが必要です");
-    return;
-  }
-
-  const current = prompt(
-    `${bracket === "upper" ? "勝者側" : "敗者側"} Seed ${seed} のチーム名を入力`,
-    ""
-  );
-
-  if (current === null) return;
-
-  const name = current.trim();
-  if (!name) return;
-
-  api("/api/seed/set-name", {
-    method: "POST",
-    body: JSON.stringify({ seed, name, bracket })
-  })
-    .then(load)
-    .catch(e => alert(e.message));
-}
-
-async function setResult(matchId, winner) {
-  try { await api("/api/results/set", { method: "POST", body: JSON.stringify({ matchId, winner }) }); await load(); }
-  catch (e) { alert(e.message); }
-}
-function decideWinner(games) {
-  let winA = 0;
-  let winB = 0;
-
-  for (const g of games) {
-    if (g.a > g.b) winA++;
-    if (g.b > g.a) winB++;
-
-    if (winA === 2) return "A";
-    if (winB === 2) return "B";
-  }
-
-  return null;
-}
-
-$("#clearSeeds").addEventListener("click", () => {
-  if (!state.pass) return alert("管理パスワードが必要です");
-  if (!confirm("全ての配置と勝敗をクリアしますか？")) return;
-  api("/api/seed/clear", { method: "POST" }).then(load).catch(e => alert(e.message));
-});
-$("#resetResults").addEventListener("click", () => {
-  if (!state.pass) return alert("管理パスワードが必要です");
-  if (!confirm("勝敗をリセットしますか？")) return;
-  api("/api/results/reset", { method: "POST" }).then(load).catch(e => alert(e.message));
-});
-$("#pass").addEventListener("input", (e) => { state.pass = e.target.value; });
-
-function drawWires() {
-  const svg = $("#wires");
-  svg.innerHTML = "";
-  const cols = $$(".col");
-  if (cols.length < 2) return;
-
-  const pad = svg.getBoundingClientRect();
-  function midRight(el) { const r = el.getBoundingClientRect(); return [r.right - pad.left, r.top + r.height/2 - pad.top]; }
-  function midLeft(el)  { const r = el.getBoundingClientRect(); return [r.left - pad.left,  r.top + r.height/2 - pad.top]; }
-
-  function connectRound(fromCol, toCol) {
-    const fromMatches = $$(".match", fromCol);
-    const toMatches = $$(".match", toCol);
-
-    // =========================
-    // 🔥 特殊：1回戦 → 2回戦（下に合流）
-    // =========================
-    if (fromMatches.length === 1 && toMatches.length > 1) {
-      const src = fromMatches[0];
-      const dst = toMatches[toMatches.length - 1]; // ← 一番下
-
-      const [x1, y1] = midRight(src);
-      const [dx, dy] = midLeft(dst);
-
-      const midX = (x1 + dx) / 2;
-
-      const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      const d = `M ${x1} ${y1} 
-                 C ${midX} ${y1}, 
-                   ${midX} ${dy}, 
-                   ${dx} ${dy}`;
-      p.setAttribute("d", d);
-      svg.appendChild(p);
-
-      return;
-    }
-
-    // =========================
-    // 通常トーナメント接続
-    // =========================
-    for (let i = 0; i < toMatches.length; i++) {
-      const src1 = fromMatches[i*2];
-      const src2 = fromMatches[i*2+1];
-      if (!src1 || !src2) continue;
-
-      const dst = toMatches[i];
-
-      const [x1,y1] = midRight(src1);
-      const [x2,y2] = midRight(src2);
-      const [dx,dy] = midLeft(dst);
-
-      const mx1 = (x1 + dx) / 2;
-      const mx2 = (x2 + dx) / 2;
-
-      addPath(x1,y1, dx, dy - 10, mx1);
-      addPath(x2,y2, dx, dy + 10, mx2);
-    }
-  }
-
-  function addPath(x1,y1, x2,y2, cx) {
-    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    const d = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
-    p.setAttribute("d", d);
-    svg.appendChild(p);
-  }
-
-  for (let i = 0; i < cols.length - 1; i++) connectRound(cols[i], cols[i+1]);
-}
-
-window.addEventListener("resize", () => { if (state.data) drawWires(); });
-
-// ---------- Roulette with deferred removal ----------
-const wheel = $("#wheel");
-const ctx = wheel.getContext("2d");
-const resultBox = $("#result");
-const pendingBox = $("#pending");
-const itemsEl = $("#items");
-const sfxSpin = $("#sfxSpin");
-const sfxStop = $("#sfxStop");
-
-$("#preset32").addEventListener("click", () => {
-  itemsEl.value = Array.from({length:32},(_,i)=>String(i+1)).join(", ");
-  drawWheel();
-  updatePending();
-});
-$("#spin").addEventListener("click", () => spin({ mode: "normal" }));
-$("#spinRemove").addEventListener("click", () => {
-  // Apply previous pending removal first
-  applyPendingRemoval();
-  spin({ mode: "defer-remove" });
-});
-
-function getItems() {
-  const raw = itemsEl.value || "";
-  return raw.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
-}
-
-let currentRotation = 0; // radians
-function drawWheel(rotation = currentRotation) {
-  const items = getItems();
-  const W = wheel.width, H = wheel.height, R = W/2;
-  ctx.clearRect(0,0,W,H);
-  ctx.save();
-  ctx.translate(R,R);
-  ctx.rotate(rotation);
-  const n = Math.max(items.length, 1);
-  for (let i=0;i<n;i++) {
-    const a0 = (i/n)*Math.PI*2;
-    const a1 = ((i+1)/n)*Math.PI*2;
-    ctx.beginPath();
-    ctx.moveTo(0,0);
-    ctx.arc(0,0,R-4,a0,a1);
-    ctx.closePath();
-    ctx.fillStyle = i%2? "#f7f7f7":"#e9eef9";
-    ctx.fill();
-    ctx.strokeStyle = "#ddd";
-    ctx.stroke();
-    ctx.save();
-    ctx.fillStyle = "#333";
-    ctx.rotate(a0 + (a1-a0)/2);
-    ctx.textAlign = "right";
-    ctx.font = "16px system-ui";
-    ctx.fillText(items[i] || "", R-20, 6);
-    ctx.restore();
-  }
-  ctx.restore();
-  currentRotation = rotation;
-}
-
-function indexAtPointer(n, rotation) {
-  const seg = (Math.PI*2)/n;
-  let angle = (-Math.PI/2) - rotation; // pointer angle minus rotation
-  angle = ((angle % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
-  return Math.floor(angle / seg) % n;
-}
-
-function openBo3Modal(matchId, aName, bName) {
-  if (!state.pass) return alert("管理パスワードが必要です");
-
-  const tpl = document.importNode($("#bo3Tpl").content, true);
-  const modal = document.createElement("div");
-  modal.className = "modal";
-  modal.appendChild(tpl);
-
-  const inputs = $$("input", modal);
-
-  modal.addEventListener("click", async (e) => {
-    const btn = e.target.closest("button");
-    if (!btn) return;
-
-    if (btn.dataset.action === "cancel") {
-      modal.remove();
-    }
-
-    if (btn.dataset.action === "save") {
-      const games = [];
-
-      for (let i = 0; i < 3; i++) {
-        const a = Number(inputs[i*2].value);
-        const b = Number(inputs[i*2+1].value);
-        if (!isNaN(a) && !isNaN(b)) {
-          games.push({ a, b });
-        }
+function createBracketModel() {
+  if (!state.bracketSize) return [];
+  let entrants = seedOrder(state.bracketSize).map(seed => ({
+    name: state.slots[seed - 1],
+    seed
+  }));
+  const rounds = [];
+  const totalRounds = Math.log2(state.bracketSize);
+
+  for (let roundIndex = 0; roundIndex < totalRounds; roundIndex++) {
+    const matches = [];
+    const next = [];
+    for (let i = 0; i < entrants.length; i += 2) {
+      const a = entrants[i];
+      const b = entrants[i + 1];
+      const id = "r" + (roundIndex + 1) + "m" + (i / 2 + 1);
+      let winner = null;
+
+      if (a.name && a.name !== "BYE" && b.name === "BYE") winner = a.name;
+      if (b.name && b.name !== "BYE" && a.name === "BYE") winner = b.name;
+      if (a.name && b.name && a.name !== "BYE" && b.name !== "BYE") {
+        const saved = state.results[id];
+        if (saved === a.name || saved === b.name) winner = saved;
       }
 
-      const winner = decideWinner(games);
-      if (!winner) return alert("まだ勝者が決まっていません");
-
-      await api("/api/results/set-bo3", {
-        method: "POST",
-        body: JSON.stringify({ matchId, games, winner })
-      });
-
-      modal.remove();
-      load();
+      matches.push({ id, a, b, winner });
+      next.push({ name: winner, seed: null });
     }
-  });
-
-  document.body.appendChild(modal);
-}
-let spinning = false;
-let pendingRemoval = null; // value scheduled to be removed on next "SPIN!(出目を削除)"
-function updatePending() {
-  if (pendingRemoval) {
-    pendingBox.style.display = "block";
-    pendingBox.textContent = `次回「SPIN!(出目を削除)」時に除外: ${pendingRemoval}`;
-  } else {
-    pendingBox.style.display = "none";
-    pendingBox.textContent = "";
+    rounds.push(matches);
+    entrants = next;
   }
+  return rounds;
 }
 
-function applyPendingRemoval() {
-  if (!pendingRemoval) return;
-  const list = getItems();
-  const idx = list.indexOf(pendingRemoval);
-  if (idx >= 0) {
-    list.splice(idx,1);
-    itemsEl.value = list.join(", ");
+function roundName(index, total) {
+  if (index === total - 1) return "決勝";
+  if (index === total - 2) return "準決勝";
+  if (index === total - 3) return "準々決勝";
+  return (index + 1) + "回戦";
+}
+
+function renderBracket() {
+  const container = $("#bracket");
+  container.innerHTML = "";
+  const rounds = createBracketModel();
+
+  rounds.forEach((matches, roundIndex) => {
+    const round = document.createElement("section");
+    round.className = "round";
+    const title = document.createElement("div");
+    title.className = "round-title";
+    title.textContent = roundName(roundIndex, rounds.length);
+    const list = document.createElement("div");
+    list.className = "round-matches";
+
+    matches.forEach(match => {
+      const card = document.createElement("div");
+      card.className = "match";
+      card.append(
+        playerButton(match, match.a, roundIndex),
+        playerButton(match, match.b, roundIndex)
+      );
+      list.appendChild(card);
+    });
+
+    round.append(title, list);
+    container.appendChild(round);
+  });
+}
+
+function playerButton(match, player, roundIndex) {
+  const button = document.createElement("button");
+  const playable = player.name && player.name !== "BYE";
+  const opponent = player === match.a ? match.b : match.a;
+  const canDecide = playable && opponent.name && opponent.name !== "BYE";
+  button.className = "player" + (match.winner === player.name ? " winner" : "");
+  button.disabled = !canDecide;
+
+  const seed = document.createElement("span");
+  seed.className = "seed";
+  seed.textContent = roundIndex === 0 && player.seed ? player.seed : "·";
+  const name = document.createElement("span");
+  name.className = "name" + (!player.name ? " empty" : "");
+  name.textContent = player.name === "BYE" ? "BYE" : (player.name || "未登録");
+  button.append(seed, name);
+
+  if (canDecide) {
+    button.title = player.name + "を勝者にする";
+    button.addEventListener("click", async () => {
+      if (!confirm(player.name + " を勝者として登録しますか？")) return;
+      try {
+        state = await api("/api/result", {
+          method: "POST",
+          body: JSON.stringify({ matchId: match.id, winner: player.name })
+        });
+        renderBracket();
+      } catch (error) {
+        notify(error.message);
+      }
+    });
+  }
+  return button;
+}
+
+function openSeeds() {
+  return Array.from({ length: state.participantCount }, (_, i) => i + 1)
+    .filter(seed => !state.slots[seed - 1]);
+}
+
+function updateAllocationControls(preferredSeed) {
+  const select = $("#targetSeed");
+  const previous = Number(preferredSeed || select.value);
+  const seeds = openSeeds();
+  select.innerHTML = "";
+  seeds.forEach(seed => {
+    const option = document.createElement("option");
+    option.value = seed;
+    option.textContent = "シード " + seed;
+    select.appendChild(option);
+  });
+  if (seeds.includes(previous)) select.value = String(previous);
+  $("#allocationStatus").textContent = seeds.length
+    ? "未登録 " + seeds.length + "枠 / " + state.participantCount + "人"
+    : "全プレイヤーの登録が完了しました";
+  $("#spinButton").disabled = spinning || !seeds.length || !rouletteItems.length;
+}
+
+function renderState() {
+  const active = Boolean(state.bracketSize);
+  $("#rouletteCard").hidden = !active;
+  $("#bracketSection").hidden = !active;
+  $("#participantCount").value = state.participantCount || 16;
+  $("#participantCount").disabled = active;
+  $("#setupForm").querySelector("button").disabled = active;
+  if (active) {
+    renderBracket();
+    updateAllocationControls();
     drawWheel();
   }
-  pendingRemoval = null;
-  updatePending();
 }
 
-function spin({ mode }) {
-  const items = getItems();
-  if (!items.length) return alert("項目を入力してください");
-  if (spinning) return;
+function parseNames(raw) {
+  const seen = new Set();
+  return raw.split(/[,、\n]+/)
+    .map(name => name.trim())
+    .filter(name => name && !seen.has(name) && seen.add(name));
+}
+
+function drawWheel(angle = rotation) {
+  const canvas = $("#wheel");
+  const ctx = canvas.getContext("2d");
+  const size = canvas.width;
+  const center = size / 2;
+  const radius = center - 12;
+  const items = rouletteItems.length ? rouletteItems : ["名前を登録"];
+  const segment = Math.PI * 2 / items.length;
+  const colors = ["#e44736", "#f2c94c", "#2b7056", "#f8eee0", "#58a6a6", "#ef8a62"];
+
+  ctx.clearRect(0, 0, size, size);
+  ctx.save();
+  ctx.translate(center, center);
+  ctx.rotate(angle);
+  items.forEach((item, index) => {
+    const start = index * segment;
+    const end = start + segment;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, radius, start, end);
+    ctx.closePath();
+    ctx.fillStyle = colors[index % colors.length];
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#171717";
+    ctx.stroke();
+
+    ctx.save();
+    ctx.rotate(start + segment / 2);
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = index % colors.length === 0 || index % colors.length === 2 ? "#fff" : "#171717";
+    ctx.font = "800 " + Math.max(12, Math.min(20, 260 / items.length + 10)) + "px sans-serif";
+    const label = item.length > 15 ? item.slice(0, 14) + "…" : item;
+    ctx.fillText(label, radius - 20, 0);
+    ctx.restore();
+  });
+  ctx.beginPath();
+  ctx.arc(0, 0, 14, 0, Math.PI * 2);
+  ctx.fillStyle = "#171717";
+  ctx.fill();
+  ctx.restore();
+  rotation = angle;
+}
+
+async function spin() {
+  if (spinning || !rouletteItems.length) return;
+  const seed = Number($("#targetSeed").value);
+  if (!seed) return notify("登録できる空き枠がありません");
   spinning = true;
-  resultBox.textContent = "";
+  updateAllocationControls(seed);
+  $("#rouletteResult").textContent = "抽選中…";
 
-  // Audio start
-  try { sfxStop.pause(); sfxStop.currentTime = 0; } catch {}
-  try { sfxSpin.currentTime = 0; sfxSpin.play().catch(()=>{}); } catch {}
+  const chosenIndex = Math.floor(Math.random() * rouletteItems.length);
+  const segment = Math.PI * 2 / rouletteItems.length;
+  const desired = -Math.PI / 2 - (chosenIndex + 0.5) * segment;
+  const normalizedDelta = ((desired - rotation) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  const startRotation = rotation;
+  const endRotation = rotation + Math.PI * 2 * 6 + normalizedDelta;
+  const started = performance.now();
+  const duration = 3800;
 
-  const n = items.length;
-  const baseTurns = Math.PI*2*(4 + Math.random()*3);
-  const randomExtra = Math.random()*Math.PI*2;
-  const total = baseTurns + randomExtra;
-  const dur = 3500;
-  const start = performance.now();
-  const startRot = currentRotation;
-
-  function animate(now) {
-    const t = Math.min(1, (now - start)/dur);
-    const ease = 1 - Math.pow(1-t, 3);
-    const rot = startRot + total * ease;
-    drawWheel(rot);
-    if (t < 1) requestAnimationFrame(animate);
-    else {
-      spinning = false;
-      const idx = indexAtPointer(n, currentRotation);
-      const val = items[idx];
-      resultBox.textContent = `結果: ${val}`;
-      try { sfxSpin.pause(); } catch {}
-      try { sfxStop.currentTime = 0; sfxStop.play().catch(()=>{}); } catch {}
-
-      if (mode === "defer-remove") {
-        pendingRemoval = val; // schedule for next delete-spin
-        updatePending();
-      }
+  await new Promise(resolve => {
+    function frame(now) {
+      const progress = Math.min(1, (now - started) / duration);
+      const eased = 1 - Math.pow(1 - progress, 4);
+      drawWheel(startRotation + (endRotation - startRotation) * eased);
+      if (progress < 1) requestAnimationFrame(frame);
+      else resolve();
     }
+    requestAnimationFrame(frame);
+  });
+
+  const winner = rouletteItems[chosenIndex];
+  try {
+    state = await api("/api/assign", {
+      method: "POST",
+      body: JSON.stringify({ seed, name: winner })
+    });
+    rouletteItems.splice(chosenIndex, 1);
+    $("#names").value = rouletteItems.join(", ");
+    $("#rouletteResult").textContent = winner + " → シード " + seed;
+    rotation = 0;
+    drawWheel();
+    renderBracket();
+    updateAllocationControls();
+  } catch (error) {
+    $("#rouletteResult").textContent = winner;
+    notify(error.message);
+  } finally {
+    spinning = false;
+    updateAllocationControls();
   }
-  requestAnimationFrame(animate);
 }
 
-// Init
-itemsEl.value = Array.from({length:8},(_,i)=>`Item ${i+1}`).join(", ");
-drawWheel();
-updatePending();
+$("#setupForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const participantCount = Number($("#participantCount").value);
+  try {
+    state = await api("/api/setup", {
+      method: "POST",
+      body: JSON.stringify({ participantCount })
+    });
+    rouletteItems = [];
+    renderState();
+    notify(participantCount + "人用のトーナメント表を作成しました");
+  } catch (error) {
+    notify(error.message);
+  }
+});
 
-window.addEventListener("load", load);
+$("#loadNames").addEventListener("click", () => {
+  rouletteItems = parseNames($("#names").value);
+  $("#names").value = rouletteItems.join(", ");
+  rotation = 0;
+  drawWheel();
+  updateAllocationControls();
+  $("#rouletteResult").textContent = rouletteItems.length
+    ? rouletteItems.length + "人を登録しました"
+    : "名前を入力してください";
+});
+
+$("#names").addEventListener("input", () => {
+  if (!spinning) $("#rouletteResult").textContent = "「ルーレットに登録」を押してください";
+});
+$("#spinButton").addEventListener("click", spin);
+
+$("#resetButton").addEventListener("click", async () => {
+  const password = prompt("管理者パスワードを入力してください");
+  if (password === null) return;
+  if (!confirm("トーナメント表・登録選手・勝敗をすべてリセットします。よろしいですか？")) return;
+  try {
+    state = await api("/api/reset", {
+      method: "POST",
+      headers: { "x-admin-password": password }
+    });
+    rouletteItems = [];
+    rotation = 0;
+    $("#names").value = "";
+    $("#rouletteResult").textContent = "名前を登録してください";
+    renderState();
+    notify("トーナメント表をリセットしました");
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
+window.addEventListener("load", async () => {
+  try {
+    state = await api("/api/state");
+    renderState();
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
