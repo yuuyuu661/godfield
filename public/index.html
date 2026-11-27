@@ -26,6 +26,10 @@
         <label for="participantCount">参加人数</label>
         <input id="participantCount" type="number" min="12" max="32" value="16" required>
         <button type="submit">トーナメント表を作成</button>
+        <label class="format-option">
+          <input id="doubleElimination" type="checkbox">
+          ダブルエリミネーション（2敗で敗退）
+        </label>
       </form>
     </section>
 
@@ -57,15 +61,32 @@
 
     <section id="bracketSection" class="bracket-section" hidden>
       <div class="section-heading">
-        <div><span class="step">03</span><h2>トーナメント表</h2></div>
+        <div><span class="step">03</span><h2 id="bracketTitle">トーナメント表</h2></div>
         <p>対戦カードのプレイヤー名を押すと勝者を登録できます。</p>
       </div>
-      <div id="bracket" class="bracket"></div>
+      <div id="bracket" class="bracket" role="region" aria-labelledby="bracketTitle" tabindex="0"></div>
     </section>
+
+    <section id="lowerBracketSection" class="bracket-section lower-bracket" hidden>
+      <div class="section-heading">
+        <div><span class="step">04</span><h2 id="lowerBracketTitle">敗者トーナメント</h2></div>
+        <p>勝者側で負けた選手は自動で合流します。敗者側で負けると敗退です。</p>
+      </div>
+      <div id="lowerBracket" class="bracket" role="region" aria-labelledby="lowerBracketTitle" tabindex="0"></div>
+    </section>
+
+    <section id="finalsSection" class="bracket-section" hidden>
+      <div class="section-heading">
+        <div><span class="step">05</span><h2>グランドファイナル</h2></div>
+        <p>敗者側の代表が第1試合に勝ったときだけ、第2試合を行います。</p>
+      </div>
+      <div id="finals" class="finals"></div>
+    </section>
+    <p id="champion" class="champion card" role="status" hidden></p>
   </main>
 
   <div id="toast" class="toast" role="status"></div>
-  <script src="/app.js"></script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>
 
