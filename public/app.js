@@ -1,10 +1,13 @@
+import { BYE, DOUBLE, SINGLE, isPlayer, resolveBracket } from "./bracket.js";
+
 const $ = selector => document.querySelector(selector);
 
-let state = { participantCount: 0, bracketSize: 0, slots: [], results: {} };
+let state = { format: SINGLE, participantCount: 0, bracketSize: 0, slots: [], results: {} };
 let rouletteItems = [];
 let rotation = 0;
 let spinning = false;
 let toastTimer;
+let savingResult = false;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -24,49 +27,6 @@ function notify(message) {
   toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
 }
 
-function seedOrder(size) {
-  let order = [1, 2];
-  while (order.length < size) {
-    const sum = order.length * 2 + 1;
-    order = order.flatMap(seed => [seed, sum - seed]);
-  }
-  return order;
-}
-
-function createBracketModel() {
-  if (!state.bracketSize) return [];
-  let entrants = seedOrder(state.bracketSize).map(seed => ({
-    name: state.slots[seed - 1],
-    seed
-  }));
-  const rounds = [];
-  const totalRounds = Math.log2(state.bracketSize);
-
-  for (let roundIndex = 0; roundIndex < totalRounds; roundIndex++) {
-    const matches = [];
-    const next = [];
-    for (let i = 0; i < entrants.length; i += 2) {
-      const a = entrants[i];
-      const b = entrants[i + 1];
-      const id = "r" + (roundIndex + 1) + "m" + (i / 2 + 1);
-      let winner = null;
-
-      if (a.name && a.name !== "BYE" && b.name === "BYE") winner = a.name;
-      if (b.name && b.name !== "BYE" && a.name === "BYE") winner = b.name;
-      if (a.name && b.name && a.name !== "BYE" && b.name !== "BYE") {
-        const saved = state.results[id];
-        if (saved === a.name || saved === b.name) winner = saved;
-      }
-
-      matches.push({ id, a, b, winner });
-      next.push({ name: winner, seed: null });
-    }
-    rounds.push(matches);
-    entrants = next;
-  }
-  return rounds;
-}
-
 function roundName(index, total) {
   if (index === total - 1) return "決勝";
   if (index === total - 2) return "準決勝";
@@ -74,63 +34,155 @@ function roundName(index, total) {
   return (index + 1) + "回戦";
 }
 
-function renderBracket() {
-  const container = $("#bracket");
-  container.innerHTML = "";
-  const rounds = createBracketModel();
+function matchLabel(id) {
+  const [, side, round, match] = /^([rl])(\d+)m(\d+)$/.exec(id);
+  return (side === "r" ? "W" : "L") + round + "-" + match;
+}
 
+function sourceLabel(player) {
+  if (player.seed) return "未登録";
+  const { id, outcome } = player.source;
+  return matchLabel(id) + (outcome === "loser" ? "の敗者" : "の勝者");
+}
+
+function renderRounds(container, rounds, side) {
+  const track = document.createElement("div");
+  track.className = "bracket-track";
+  const cards = new Map();
+  const edges = [];
   rounds.forEach((matches, roundIndex) => {
     const round = document.createElement("section");
     round.className = "round";
-    const title = document.createElement("div");
+    const title = document.createElement("h3");
     title.className = "round-title";
-    title.textContent = roundName(roundIndex, rounds.length);
+    title.textContent = side === "lower" && roundIndex < rounds.length - 1
+      ? (roundIndex + 1) + "回戦"
+      : roundName(roundIndex, rounds.length);
     const list = document.createElement("div");
     list.className = "round-matches";
 
     matches.forEach(match => {
-      const card = document.createElement("div");
-      card.className = "match";
-      card.append(
-        playerButton(match, match.a, roundIndex),
-        playerButton(match, match.b, roundIndex)
-      );
+      const card = matchCard(match, state.format === DOUBLE ? matchLabel(match.id) : "");
+      cards.set(match.id, card);
+      for (const entrant of [match.a, match.b]) {
+        if (cards.has(entrant.source.id)) edges.push([entrant.source.id, match.id]);
+      }
       list.appendChild(card);
     });
-
     round.append(title, list);
-    container.appendChild(round);
+    track.appendChild(round);
   });
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const lines = document.createElementNS(svgNS, "svg");
+  lines.classList.add("bracket-lines");
+  lines.setAttribute("aria-hidden", "true");
+  track.prepend(lines);
+  container.replaceChildren(track);
+
+  const previousObserver = bracketObservers.get(container);
+  previousObserver?.disconnect();
+  function drawConnections() {
+    const origin = track.getBoundingClientRect();
+    const rects = new Map(Array.from(cards, ([id, card]) => [id, card.getBoundingClientRect()]));
+    lines.replaceChildren(...edges.map(([from, to]) => {
+      const a = rects.get(from);
+      const b = rects.get(to);
+      const x1 = a.right - origin.left;
+      const x2 = b.left - origin.left;
+      const y1 = a.top + a.height / 2 - origin.top;
+      const y2 = b.top + b.height / 2 - origin.top;
+      const mid = (x1 + x2) / 2;
+      const line = document.createElementNS(svgNS, "path");
+      line.setAttribute("d", `M ${x1} ${y1} H ${mid} V ${y2} H ${x2}`);
+      return line;
+    }));
+  }
+  drawConnections();
+  const observer = new ResizeObserver(drawConnections);
+  observer.observe(track);
+  bracketObservers.set(container, observer);
 }
 
-function playerButton(match, player, roundIndex) {
+const bracketObservers = new WeakMap();
+
+function renderBracket() {
+  const model = resolveBracket(state);
+  const isDouble = state.format === DOUBLE;
+  $("#bracketTitle").textContent = isDouble ? "勝者トーナメント" : "トーナメント表";
+  $("#lowerBracketSection").hidden = !isDouble;
+  $("#finalsSection").hidden = !isDouble;
+  renderRounds($("#bracket"), model.upper, "upper");
+  if (isDouble) {
+    renderRounds($("#lowerBracket"), model.lower, "lower");
+    $("#finals").replaceChildren(...model.finals.map((match, i) =>
+      matchCard(match, i === 0 ? "第1試合" : "第2試合（ブラケットリセット）")
+    ));
+  }
+  const champion = $("#champion");
+  champion.hidden = !model.champion;
+  champion.textContent = model.champion ? "優勝　" + model.champion : "";
+}
+
+function matchCard(match, label) {
+  const card = document.createElement("div");
+  card.className = "match";
+  card.dataset.match = match.id;
+  if (label) {
+    const heading = document.createElement("div");
+    heading.className = "match-label";
+    heading.textContent = label;
+    card.appendChild(heading);
+  }
+  card.append(playerButton(match, match.a, 0), playerButton(match, match.b, 1));
+  return card;
+}
+
+function playerButton(match, player, index) {
   const button = document.createElement("button");
-  const playable = player.name && player.name !== "BYE";
   const opponent = player === match.a ? match.b : match.a;
-  const canDecide = playable && opponent.name && opponent.name !== "BYE";
-  button.className = "player" + (match.winner === player.name ? " winner" : "");
-  button.disabled = !canDecide;
+  const winner = isPlayer(player.name) && match.winner === player.name;
+  button.type = "button";
+  button.className = "player" + (winner ? " winner" : "");
+  button.disabled = !match.playable;
 
   const seed = document.createElement("span");
   seed.className = "seed";
-  seed.textContent = roundIndex === 0 && player.seed ? player.seed : "·";
+  seed.textContent = player.seed ?? "·";
   const name = document.createElement("span");
-  name.className = "name" + (!player.name ? " empty" : "");
-  name.textContent = player.name === "BYE" ? "BYE" : (player.name || "未登録");
+  name.className = "name" + (!isPlayer(player.name) ? " empty" : "");
+  if (player.name === BYE) {
+    name.textContent = "BYE";
+  } else if (player.name) {
+    name.textContent = player.name;
+  } else if (match.id.startsWith("gf")) {
+    name.textContent = index === 0 ? "勝者側の代表待ち" : "敗者側の代表待ち";
+  } else {
+    name.textContent = state.format === DOUBLE ? sourceLabel(player) : "未登録";
+  }
   button.append(seed, name);
 
-  if (canDecide) {
+  if (match.playable) {
     button.title = player.name + "を勝者にする";
     button.addEventListener("click", async () => {
-      if (!confirm(player.name + " を勝者として登録しますか？")) return;
+      if (savingResult || winner) return;
+      const message = match.winner
+        ? player.name + " に勝者を訂正しますか？ 対戦者が変わる後続試合の結果は取り消されます。"
+        : player.name + " を勝者として登録しますか？";
+      if (!confirm(message)) return;
+      savingResult = true;
       try {
         state = await api("/api/result", {
           method: "POST",
-          body: JSON.stringify({ matchId: match.id, winner: player.name })
+          body: JSON.stringify({ matchId: match.id, winner: player.name, opponent: opponent.name })
         });
         renderBracket();
+        const card = $(`[data-match="${match.id}"]`);
+        card?.querySelectorAll(".player")[index]?.focus({ preventScroll: true });
       } catch (error) {
         notify(error.message);
+      } finally {
+        savingResult = false;
       }
     });
   }
@@ -158,12 +210,21 @@ function updateAllocationControls(preferredSeed) {
     ? "未登録 " + seeds.length + "枠 / " + state.participantCount + "人"
     : "全プレイヤーの登録が完了しました";
   $("#spinButton").disabled = spinning || !seeds.length || !rouletteItems.length;
+  $("#names").disabled = spinning;
+  $("#loadNames").disabled = spinning;
+  select.disabled = spinning || !seeds.length;
+  $("#resetButton").disabled = spinning;
 }
 
 function renderState() {
   const active = Boolean(state.bracketSize);
   $("#rouletteCard").hidden = !active;
   $("#bracketSection").hidden = !active;
+  $("#lowerBracketSection").hidden = !active || state.format !== DOUBLE;
+  $("#finalsSection").hidden = !active || state.format !== DOUBLE;
+  if (!active) $("#champion").hidden = true;
+  $("#doubleElimination").checked = state.format === DOUBLE;
+  $("#doubleElimination").disabled = active;
   $("#participantCount").value = state.participantCount || 16;
   $("#participantCount").disabled = active;
   $("#setupForm").querySelector("button").disabled = active;
@@ -177,8 +238,8 @@ function renderState() {
 function parseNames(raw) {
   const seen = new Set();
   return raw.split(/[,、\n]+/)
-    .map(name => name.trim())
-    .filter(name => name && !seen.has(name) && seen.add(name));
+    .map(name => name.trim().slice(0, 80))
+    .filter(name => isPlayer(name) && !state.slots.includes(name) && !seen.has(name) && seen.add(name));
 }
 
 function drawWheel(angle = rotation) {
@@ -279,10 +340,11 @@ async function spin() {
 $("#setupForm").addEventListener("submit", async event => {
   event.preventDefault();
   const participantCount = Number($("#participantCount").value);
+  const format = $("#doubleElimination").checked ? DOUBLE : SINGLE;
   try {
     state = await api("/api/setup", {
       method: "POST",
-      body: JSON.stringify({ participantCount })
+      body: JSON.stringify({ participantCount, format })
     });
     rouletteItems = [];
     renderState();
